@@ -1,0 +1,164 @@
+EfficientML.ai Lecture 3 - Pruning and Sparsity (Part I) (MIT 6.5940 Fall 2026) [47nNIPj3B98]
+Source: https://www.youtube.com/watch?v=47nNIPj3B98
+Language: English
+Transcript source: YouTube automatic captions; unedited.
+
+[00:00:04] Okay. Hello everyone. Um good afternoon. Let's get started. Uh so today we are going to talk about lecture three about efficient ML. Uh we are going to talk about important technique which is pruning and sparsity. Uh so uh in the previous two lectures we had a overview of this um lectures basics like what what are the basic uh concepts neurons connections weights flops how do we calculate those efficiency metrics um so from today we
+
+[00:00:36] are going to talk about the first part of this lecture which is efficient inference. So for efficient inference techniques we are going to talk about how to reduce the number of parameters by pruning and sparsity and how to reduce the width the bit width for each parameter. So that's quantization. We are going to spend two lectures on sparsity and two lectures on quantization and next we are going to spend two more two more lectures on neuro architecture search. So to arrive at the same
+
+[00:01:07] accuracy you have you can have so many different neuronet network architectures. Some of them are hardware friendly, some of them are not hardware friendly. Um how do we design the architecture that give you the best trade-off between the accuracy and efficiency and then we are going to talk about knowledge distillation from a teacher model to a student model. How you transfer the knowledge? question. >> We we have the website efficientml.ai.
+
+[00:01:38] Everything is on online. It will be posted after the lecture. >> Yeah. >> So you can see it, right? Um the lecture slides is mostly the same as last year. So you you can also go to previous lecture uh to check the the slides and videos. and then knowledge distillation. Following that we are going to have MCU net which is a case study how to deploy a vision model onto a microcontroller
+
+[00:02:08] onto a MCU. Uh and finally we are going to talk about tiny engine and parallel processing. How do you uh how to write your own inference library to uh run the model on a 256 kilobyte microcontroller. So let's review the concept. Uh what is the bottleneck that makes AI so expensive? So it is the memory movement. And um so here we are comparing the uh
+
+[00:02:40] energy consumption for different operations including arithmetic operations multiplication and the caching and memory. So memory access is more than uh two orders of magnitude more energy consuming than uh arithmetic computation. So to make deep learning more efficient we should save the memory and if some weight is redundant we should remove it. we should prune it. So that motivates us to learn about
+
+[00:03:12] pruning. Uh we are going to first introduce uh what is pruning and how do we formulate pruning. So pruning basically turns a dense model into a sparse model. Uh so in general we can formulate pruning as we try to minimize uh trying to find the set of set of weights. Okay. Um the number of non-zero weight should be smaller than M and we uh we try try
+
+[00:03:42] to minimize the loss function. So L here represents the object function or for neuronetal training the loss and X is the input. W is the original weight and WP is the prune weight. Uh so we try to minimize the loss function. Well, make sure the nonzeros in WP and see from the second row, the nonzeros of WP should be smaller than N. N is the target number of nonzeros. Uh since you
+
+[00:04:14] only need to store those nonzero element uh in the memory, if you have less or smaller N, that can save you uh the memory. And next how do we determine the pruning uh granularity. So uh that's the second part. And third part we're going to talk about pruning criterion and determine the pruning ratio and how to recover the accuracy after after pruning.
+
+[00:04:44] Okay. So what is pruning? Uh pruning naturally happens in a human brain. Um this figure shows from a newborn uh baby to um two to four years old and then adolescence and then adult. The yaxis is showing the number of synapses in the brain. Uh it started with about um 2500 2,500 synapses per neuron and as the baby grow
+
+[00:05:16] from a newborn to two to four years old that number actually peaked to roughly about uh 15,000 synapses per neuron and as he or she grew up to adolescence. Interestingly, this number didn't keep increasing but from this study uh do we have brain to spare? Uh from this nature study um the number of neurons actually didn't decreas but start to uh decrease during the adolescence.
+
+[00:05:49] Actually adolescence is the period where we go to school we learn the most of of our knowledge during that period. So pruning is a important mechanism to learn new stuff during the period when we are learning uh most of the stuff in the whole lifetime. And as the human become a adult grow to adult the number of neurons synapses per neuron stabilizes to roughly 7,000
+
+[00:06:21] synapses per neuron. So you can see roughly half of the uh synapses actually got pruned in our brain. So pruning is not a bad thing. It's a natural thing that happened. And how about uh neuronet networks? How do we prove a neuronet network? So before pruning every neuron is connected to everything from the previous layer is dense. And we can make the neuronet network smaller by removing those redundant
+
+[00:06:55] synapses and neurons. For example, we can prune the synapses. You can see on the second image right here um the best connection becomes sparse. We remove lots of redundant stuff. We can also prune the neurons. For example, the neuron here gets pruned. So all the connections from the input and out connections as output has been removed completely for that particular
+
+[00:07:25] neuron. And how does this pruning process affect the accuracy? Imagine you have 100% of connections. You gradually prune them um more and more. You can imagine the weight will decrease. So the more you prune the lower the accuracy. Um with about 50% probably you can still uh have
+
+[00:07:56] okay accuracy. This is Alex net um on imageet. This was from my PhD thesis learning both grids and connections for efficient neuronet networks. It's actually 11 years ago new 2015. So I experimented with Alex net. The more you prune the less accurate accurate you get. What about the distribution? Initially it's roughly forming a normal distribution but after pruning um
+
+[00:08:27] everything close to zero we remove them away. So this is too bad. Uh we lose accuracy um which we don't want to uh see. But what about we fine-tune the remaining the surviving weight? Say you prune away 80% of the parameters like right here. This is about 80%. Um previously you lose a lot of accuracy
+
+[00:08:58] but after fine-tuning um you can recover the accuracy. Some of them can even have slightly higher accuracy due to less overfitting. for example, the two middle green dots. So now we can push the pruning ratio from uh 50% to 80%. This is really good. You can remove 80% of the parameters in the model without losing accuracy. So that's the distribution after
+
+[00:09:28] retraining can we can see the distribution actually become smoother and flatter. they changed a little bit some nonzero element some zero element actually becomes non zero because of the retraining so the surviving weight will adjust each other to recover the the accuracy so is 80% the limit can we go further just for more I have a question
+
+[00:10:02] No, no, this is not this was exm wasn't there yet. That was 11 years ago. So, um this is for Alex net. Um for convolution layer roughly you can prune away maybe half for FC layer fully connected layer you can prune roughly 90%. And for large language models depending on the granularity these days for channel pruning you can remove roughly half but not 90%. So these models are very old
+
+[00:10:34] and they are highly redundant. Modern architectures are more compact and more efficient. We can learn those from neuro architecture search. But still 50% is a good guess for modern large language models.
+
+[00:11:10] No, no structure. It's very random. Um the node is very random. But later we are going to see how can we structure them such that you can have some patterns. The problem of random pattern is is not GPU efficient. It's very hard to paralyze. But we'll talk about technique to make them structured. So continue our question. Can we uh push the pruning ratio more? Um you can see
+
+[00:11:41] from the red curve we further push it to the right hand side. Uh meaning that we can prune up to 90%. 90% of the parameters without losing losing accuracy. And this is achieved by here iteratively remove a few connections and then retrain it and then remove a little bit more and then retrain the remaining part. So by such iterative pruning and retraining you can gradually prune more and recover the accuracy.
+
+[00:12:13] And the idea is you shouldn't just prune everything uh to the extreme but you can prune step by step and each time you can uh gain a little bit. Um so this was the uh was in my PhD thesis like 10 years ago for at that time Alex net, VG, Google net, resident 50 and squeezet. So they can be pruned. You can see the reduction ratio on the second to the
+
+[00:12:43] last column from nine times to 12 times for Google net which is already much more efficient than the others. You can see it can prune be pruned less but still a significant amount which is 3.5 times. Um ResNet 50 is more efficient architecture. It can be pruned at about 3.4 times and squeezet um about 3.2 times. And interestingly after pruning the number of parameters um look roughly
+
+[00:13:13] in the same order of magnitude although before pruning the model size differ a lot. Some of them are like tens of hundred of megabytes one megabyte medium parameters but after pruning they're roughly in the same range uh six 10 two seven 0.3 etc. meaning roughly for a similar task you need a certain amount of capacity to do it. So this is for image caption. We want to
+
+[00:13:45] double check whether pruning can um hurt the accuracy. So this is the baseline on the left hand side. A basketball player in the white uniform is playing with a ball. And if you prune away 90%, it's going to caption a basketball player in a white uniform is playing with a basketball. The second one, a brown dog is running through aggressive field versus after pruning. 90% a brown dog is running through aggressive area.
+
+[00:14:16] The third one, a man is riding a surfboard on a wave. That's the original caption. After pruning 90% a man in the white suit is riding a wave on a beach. That's good. But you cannot go too far. As intuition says, if you prune too much too much, it's going to get drunk. For example, here a soccer player in the red is running through the field in the field. That's correct. Well, if you prune away 95%, not 90%, it's 95%. It's a lot. Meaning you keep only 5% of the
+
+[00:14:48] weight. It says a man in a white red shirt and black and white black shirt is running through a field. He's kind of getting drunk, right? So there's a limit and uh we cannot prune everything away. So this is a little bit of history. Uh the pruning study roughly started 20 uh 20 1989 with the paper optimal brain damage and then each year some papers until 2015
+
+[00:15:22] when I published this deep compression paper like deeply compressed deep neuronet networks deep compression um it suddenly searched in recent years getting super popular lots of citations lots of publications um especially when uh large language model comes where um computation becomes very becomes a bottleneck. Uh sparity becomes super important. So sparity these days also evolved into sparse attention. Uh we are going to talk about sparse attention in
+
+[00:15:53] the second part of this lecture where the attention mechanism except for QKV doesn't have any weights. Right? This QK transform time um time times V right there's no weight. But still there is opportunity to leverage sparity where you don't need to pay attention everywhere. You only pay attention where is needed. So that's another form of sparity. We can leverage although in attention there's no weight. And you can also leverage the sparity and the pruning in the weight of QVO and
+
+[00:16:26] the two FFN layers. Uh don't worry if you don't understand. We are going to talk deeper in the second part of the lecture about large language model deployment. How about pruning in industry? Um there are a lot of hardware support for sparity. For example, in my PhD thesis, the efficient inference engine that was published in ISCA 2016 proposed architecture to directly run
+
+[00:16:56] the FFN layers uh using uh sparse and quantized model. Uh that was actually the top five cited paper in 50 years of ISA from uh 200 1953 to 2023. An efficient speech recognition engine pushed this forward to FPGAs and then Spark and Spartan done by Jai and Henry from our group. They got a um further pushed it to sparse attention and uh
+
+[00:17:28] sparse matrix multiplication. Um and later um media adopted this two to four sparsity which is every four elements at least two of them should be zero. Okay, so that's two to four sparsity from a dense matrix into a sparse matrix and is natively supported uh since the MP architecture providing 2x more pick performance and 1.5 times measured speed up.
+
+[00:18:00] Oh, tink also adopted now AMD reduce the model complexity with minimal accuracy impact. Okay. And how do we determine the granularity of sparity? Just like the question before after pruning do we see some patterns okay actually it's random pattern but can we um enable um it to have certain pattern such that after pruning uh it's very easy to process on
+
+[00:18:30] the GPUs. So we'll talk about the second part which is the pruning granularity. So this is example of a 2D m weight matrix. It's dense and uh if you prune it, we color it to be white. So the first example is a fine grained and unstructured sparity. The white dot can be everywhere, can be anywhere. There's no pattern.
+
+[00:19:01] It's very flexible. You can prune anything. If it is small, if it is redundant, then just remove it. But the drawback you can imagine is hard to accelerate. It's very irregular. It's hard to paralyze a more coarse grain structure or structured pruning. You can prune the entire row like you can keep the first row, you can keep the second row and the third row here is pruned and the fifth row is pruned. fourth row is pruned
+
+[00:19:35] and then you can only compute on the remaining nine zero weight. So previously the matrix has how many how many rows? Previously you have eight rows and after the row pruning you have only five rows and you can feed uh these five rows to the same GPU kernel for matrix multiplication. you don't need to do anything. The GPU can take it as a
+
+[00:20:06] normal dense uh dense model, right? So, it's very easy to accelerate just a smaller matrix. It's still dense. Whatever API koda kernel you call can be the same koda kernel, but you can imagine this would be harder to maintain accuracy. will be harder to prune because once you prune you have to prune the whole row and every everything in the so whole row have to suffer if you want to prune it.
+
+[00:20:37] So let's dive a little deeper by defining a few dimensions. Uh in the convolution layer you have the CI which is the input channel. You have the CO which is the output channel. You have KH which is kernel size and the height. You have KW in the kernel size of the width. Using those four dimensions we can have a lot of choices. So in this example we have two input channels. two channel uh two columns and then we have three rows
+
+[00:21:08] corresponding to three output channels and the kernel size is three KH and KW. There could be many different granularities. The first one is fine grain pruning. You can prune any weight in any channel in any input channel any output channel. It's completely random. It's the most flexible but is the hardest to accelerate. And the second one you can do um pattern
+
+[00:21:40] based uh pruning. For example, uh you can do keep the middle one and the top and left and right etc. And you have fixed amount of pattern. So if you implemented one kernel for one channel, you can reuse that limited amount of kernels for other channels. You can also do vector level pruning. For example, each 3x one or one by three element, you either prune it or not
+
+[00:22:10] prune it for the weight. You can also do kernel level pruning. Uh for for the entire 3x3 uh kernel, you either keep it or throw it away. And the most coarse granularity is the channel level pruning for all the filters in the entire channel. Um this 3x3x3 you can prune away or keep it.
+
+[00:22:42] So what are the pro and cons? So of course like we uh just mentioned the fine grain pruning is easy to prune easy to recover the accuracy. We can potentially prune at a higher ratio uh but it's harder to accelerate. The regular pruning on the right hand side is easier to accelerate but harder to maintain the accuracy and harder to achieve high compression ratio.
+
+[00:23:13] So the fine grain pruning um is probably the um giving the largest compression ratio like we just saw for Alex net, VG, Google net etc. Um they can speed up on some customized hardware like efficient inference engine but not easily on GPUs. So for pattern based pruning if you enforce certain panel pattern like 2 to4 sparity you can still get acceleration. Uh for example this is a dense matrix
+
+[00:23:45] and this is a 2 to4 sparse matrix. Uh each group has four element like we have in the orange rectangle. Um each rectangle is is of size four. Okay. And for the four element two of them should be zero. And the compressed matrix you can keep only the nonzero element. For example, previously we have uh eight elements
+
+[00:24:18] right here in the row. Right? And then after compression um we get only four elements in a row the green elements. and we store the indices of those non-zero element in the um in a separate purple matrix. So the total storage on the right hand side is much smaller than the middle one. So it usually well maintain the accuracy. Um so these are the different models ResNet exception SSD BERT etc.
+
+[00:24:52] the top one accuracy um the dense version versus the sparse version. We can see the last two columns you compare the accuracy. They're pretty much neck and neck. While the most um coarse grain uh configuration is the channel level uh pruning which is easiest to accelerate. you don't need you don't need to even change uh the hardware and just use the same kernel.
+
+[00:25:24] So the pro is very easy to accelerate due to the reduced channel number uh leading to a neuronet network with smaller number of channels. But the uh con the the downside is you may have a smaller compression ratio and later we'll discuss how to find the sparity ratio for uh each layer. You can of course uh uniformly shrink each
+
+[00:25:54] layer. Um for example in this case every layer is shrinkedked to uh 0.3 uh 30%. You can also distribute your limited amount of resource uh to different layers. For example, first layer 0.5, second layer 0.3, third layer 0.7. Later we are going to talk about how to find those sparity ratios. Actually if you smartly find the sparity
+
+[00:26:27] ratio you can get a higher tradeoff. So here the x-axis is the latency the speed the y axis is the u the accuracy you want to have a lower latency and higher accuracy. So the left top corner is a good spot. So by using a technique called auto automated compression using pruning in that way you can search a better compression ratio for each layer.
+
+[00:26:58] Okay. Now now let's uh talk about how to determine the pruning uh criterion. There are so many ways to prune and what is synapsis and which neuro should we prune. So here is example uh of a simple neuronet network layer just one layer with three parameters. So y = to um 10 x0 minus 8 x1 plus 0.1
+
+[00:27:33] x2. It has only how many weights? Only three weights, right? 10 minus 8 0.1 for this three weight neuronet network. If one weight need to be pruned to be removed on intuition, which one need to be removed? Which one do you want to remove? The la the last one, right? 0.1 because it has the smallest magnitude um will impact the least to the overall
+
+[00:28:04] accuracy. So that's magnitude based pruning the most intuitive one simplest one and actually for the past 10 years it's been widely adopted uh the most straightforward one is probably the easiest to be adopted by industry and complicated one actually uh gets very hard the importance is just proportional to the absolute value of the weight if the weight's magnitude is small then just remove it
+
+[00:28:35] you can If you use L1 norm, you can use L2 norm. So if you use L1 norm in this example, you have four weight three minus 2, one and minus 5. So using L1 norm, uh you calculate R1 norm, you got three, two, one, and five. And you pick the smallest one to remove, which is one and two. You remove them, meaning that you're going to zero them out. So you are left with the two remaining weights which is three and minus five.
+
+[00:29:07] So this is um R1 norm. You can also do this is the um using the absolute value. You can also use the A1 norm um for if you want to have a coer or coarse grain pruning like you prune at the granularity of the whole row and each row has two elements in this case. Uh so to calculate our norm you can sum up the absolute value. For example the first
+
+[00:29:38] row you have three plus two you have five. For the second row you have one plus five you have six. three five is smaller than six. Then we are going to prune the first first row. So all the elements in the first row become zero and all the row all the elements in the second row is kept. Uh we can also do our two norm basically you can calculate our two norm of the first row which is uh 3 to the^ of 2 + -
+
+[00:30:12] 2 to the^ of two. uh so you can easily compare which is smaller then prone it away in general you can also prune uh using our p norm so w i to the power of p and sum sum sum sum them up and to the power of one over p there's also a scaling based pruning so you have n channels and each channel can
+
+[00:30:43] have a uh the scaling factor, right? You can have a learn scaling factor for each channel. Um, if the first channels learn the scaling factor is 1.17 and the second one is 0.1, the third one is 0.29, uh, you can remove the ones with a smaller scaling factor because the model determines which row is import which channel is important by a learning based approach. And if it decides okay channel one is not that important the weight is
+
+[00:31:16] only 0.1 it learned that the first channel may not be that important. So we can sort this channel scaling factor and then prune the channel with the smallest uh scaling factor. So in this case um the first channel uh first filter and the second filter is very small with respect to the scaling factor then they are pruned and we are left with only uh filter zero filter
+
+[00:31:48] three etc. And the scaling factor can also be reused for from the batch normaliz batch normalization layer. Remember in the batch normalization we subtract the mean and divide it by the variance. We have a alpha and the beta was scaling factor and the bias. We can reuse the scaling factor over there to determine which channel is important.
+
+[00:32:20] Okay, those are very simple heristics based on the absolute value one norm2 norm. There's a more complicated approach which is second order based pruning to minimize the error of the loss loss function. So we try to minimize this delta L. Delta L is defined as the original weight the weight before pruning with input X. We get the loss versus the WP. WP is the
+
+[00:32:50] original weight minus delta W. Some of the weights are removed. So this is the delta w using the same x. Uh we can do the tailor expansion. Um if you change the delta first order gradient times delta i and hi which is a second order times w i squar and the cross terms. Those are the second order terms. And later we have the third order terms which we are going
+
+[00:33:22] to ignore because uh they are too small. For the first order term we can also neglect it because um after training the model pretty much converged. So the gradient the first order gradient is very close to zero. So we can safely remove it. We can also u neglect the cross terms. So during the optimization we feel each parameter is independent. So we can neglect the cross terms. So we are left
+
+[00:33:55] over with only the hi times wi squared the second order term which is the hashing. Uh but the hashing is pretty uh computationally heavy. Of course you can do some approximation um but this is in general um if the model is pretty large it's hard to compute. We can also prune the neurons not only the weight. What does it mean if you
+
+[00:34:26] prune a neuron for fully connected layer? If a neuron is pruned it means the whole row is pruned like everything connected to it will be removed. So the weight matrix will have one less row for convolution layer. If certain neuron is uh pruned, it means all the connections to it will also be zeroed out. So that's the uh what it look like for the weight matrix. And how do we determine which channel to
+
+[00:34:57] prune? We can use this percentage of zero based pruning. So after relu um which is a pretty popular activation function after relu you will generate a lot of zeros in the output activation like in this output we have batch uh two batches and three channels each channel we have a width of four and height of four. Uh which channel should we prune in this case? uh we are going to calculate this
+
+[00:35:30] average percentage of zeros like for the first channel channel zero how many elements do you have? So here we have five um we have five zeros and then in the second batch which is right here we have six zeros. Um so alto together we have five plus six this amount of uh zero element and al together we have four four time four * two which is 32 element. So the
+
+[00:36:03] average percentage of zero is 11 divided by 32 for channel one uh channel zero starting with zero. What about channel one? So five + 7. So this is five uh zeros and here you have seven zeros and five + 7 divided by 32 that's channel one and similarly you can calculate channel 2 is 14 divided by 32. So which one should we remove? We should remove the one with the highest average
+
+[00:36:34] percentage of zeros. So here we we remove the last channel because it has the most amount of zeros. If we remove it, it has the least impact. So here we can also do a regression based pruning uh which also aim at minimizing the reconstruction error. So you have x the activation you have the w after pruning which is the weight and then we can
+
+[00:37:06] minimize the error between uh between z. uh we first uh fix uh one part of it and only change the uh the second part to solve this problem by first fixing the weight and then solve the beta for each channel selection for the input for the activation and then we fix the activation and then we solve for the w uh to minimize the uh the change.
+
+[00:37:38] So we iterative iteratively uh fix w and change weight and then fix weight uh fix weight and change uh change the activation uh to minimize the error. Okay. So uh we got a pretty uh quick summary here. So we talk about what is pruning, granularities of pruning and criteria to select the way to prune. And before we go back, let's see an
+
+[00:38:09] interesting demo to um strengthen what we have learned for today. Oh, sure. Okay. So, here we have the activation and we have the weight. Uh here we are pruning the uh second channel in this example and we want to minimize the error between the Z and Z tilda.
+
+[00:38:42] Uh so here the Z equal to X uh times the W. Okay, we can consist of many channels. Here we have four channels. So we sum from channel zero to channel three for each individual channel. Right? So you can imagine if x0 times w0 uh this dimension is 2x one this dimension is one by one by 8 the result will be a 2x8 matrix right and then x1 *
+
+[00:39:14] w1 you can get another uh 2x 2x8 x2 * w2 x3 * w3 so each time you get a partial result and each one has the same dimension which is 2 by 8. That's why we have this summation. How many terms are we summing up in this example? Four. Yeah. Right. Four. Okay. So far so good. And then um we have uh zuta. Okay.
+
+[00:39:45] Zuta is the pruned version. So the pruned version is consisting of uh we are also summing up from C 0 to CI minus one. Okay. And um we want to make sure um the number of nonzero elements is smaller than than n. In this case, we want to have one of them pruned. We want to have only uh three of them remaining um than zero. Okay. So this is a constraint. We want to make sure we have left over with something less than three
+
+[00:40:17] channels. And which one um should be uh pruned? That's determined by beta which is the coefficient for length CI. What is length CI? In this case, CI is four, right? We have four input channels and we have we can select to prune the channel zero, channel one, channel two, channel three. So, we have four choices. That's the beta. If the beta is zero, what does it mean? That it's removed. It's pruned, right?
+
+[00:40:48] Which means it's pruned. Okay. And um NC is the number of non-zero channels. So in this case NC equal to three. We have three nonzero channels. Okay. So far so good. And now we want to solve the problem. Okay. So which one do we keep? That's determined by beta. And we want to first uh fix the W uh and only solve the beta for channel selection. Okay. Assuming the weight is fixed and you only prune
+
+[00:41:18] the activation, which channel should you select to minimize the error and then you fix the beta assuming the channel the input is fixed. You want to change the weight and you want to solve the W to minimize the reconstruction error and then you can iterate between the weight and activation weight and activation until you coverage. So this is how you solve this problem using a regression based pruning. Regression means you formulate the problem as a optimization function.
+
+[00:41:51] You have the target, you have a constraint, and you try to minimize uh the uh

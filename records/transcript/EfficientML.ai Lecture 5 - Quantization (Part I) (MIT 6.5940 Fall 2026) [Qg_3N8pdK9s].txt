@@ -1,0 +1,260 @@
+EfficientML.ai Lecture 5 - Quantization (Part I) (MIT 6.5940 Fall 2026) [Qg_3N8pdK9s]
+Source: https://www.youtube.com/watch?v=Qg_3N8pdK9s
+Language: English
+Transcript source: YouTube automatic captions; unedited.
+
+[00:00:00] Test. Test. Okay. All right. Let's get it started. Welcome to efficient ml.ai. Today is lecture five. We are going to talk about quantization. So in the last lecture we talked about pruning, how to reduce the number of parameters. We can reduce the number of parameters and activations by 10 times or three times without hurting the accuracy if you properly fine tune it. We also talked about how to find the optimal
+
+[00:00:31] sparsity ratio for different layers using both automated approach and also rule-based approach. Now we are going to dive into the next chapter, which is quantization. Beyond reducing the number of parameters, we can also reduce the bit width for each parameter. You don't need a full precision, but we can use integer bits or low precision bit to represent the number. So in this lecture we'll first review the numeric data types including integers and floating
+
+[00:01:02] point. We're also going to learn the basic concepts of neural network quantization and the three types of network quantization method, which is K-means based approach, the linear quantization, and also binary and ternary quantization. Some background. The uh computation is cheap, but memory is expensive. So if you go lower precision, if you have less precision, you need to fetch fewer number of bits and also the
+
+[00:01:36] you fetch less number of bits, so you reduce the num- memory movement. For example, if you have to move 32-bit floating point versus you just need to move 4-bit integer, you can save eight times uh less memory and have fewer um memory traffic. And less memory means it's more energy efficient. Data movement can be as much as 200 times more energy consuming compared with computation.
+
+[00:02:09] So, let's first talk about numeric data types. How are the numbers actually represented? Are zeros actually zeros? Are infinite numbers actually infinite numbers? Actually, they are not the case. Um people might think, "Okay, we have a real number, then we can have uh like infinite precision." But actually, those are not the case. >> [snorts] >> We're going to introduce um integer [clears throat] representation first, starting with unsigned integer.
+
+[00:02:40] So, for n-bit integer, we can represent a number from 0 to 2 to the power of n minus 1. Uh in this case, on the right top right corner, here we have um eight bits. Um so, the uh the last bit represent 2 to the power of minus 2 to the power of 0. Okay? On the top right corner, and here is 2 to the power of 1, 2, all the way to 2 to the power of 7. So, this is unsigned integer, uh the simplest case. We just add up
+
+[00:03:11] add all the numbers together. We also have the signed integer. Um the first bit, uh you can see on the second row in the example, uh the first bit is the sign bit. If it is 1, it indicates this is a negative number. If it is 0, then it's a positive number. We also have the two's complement complementary presentation. Um so, the first the first bit represent 2 to the power of minus 7 in this case. Altogether,
+
+[00:03:43] there are eight bits. Uh the first number is 2 to the power of of 7. Uh what's the benefit of this? You may recall from our prerequisite class 6.191 to represent zero if it is a signed integer What's the problem here? Both uh 000 and 1000 they all represent zero, right? Positive zero, negative zero, they're all zero. So, you are wasting one of the valuable
+
+[00:04:16] slots for the representation. But, two's represent uh two's complement representation has solved this problem. Uh 1000 will represent uh minus two to the power of n minus one. And only 0000 represents zero. So, that's the benefit of two's complement representation. Okay. Not only integer, but also uh fixed-point number um it's easy to uh understand. You just
+
+[00:04:47] have a decimal point, okay? On top row. Before uh to the left of the decimal point, you have the integer part. And to the right of the decimal point, you have the fraction point. As simple as that. In the second row shows an example where the first bit is a sign bit. Um it's zero, okay? And um so, in the two's complement uh representation, this that number is zero
+
+[00:05:18] and the the next one is also zero. Uh the third one is one, the fourth one is one, so they are representing two to minus two to the power of three for the first bit. And then zero followed by two to power one, two to power zero. So, that's to the left of the decimal point. To the right of the decimal point, you have two to the power of minus one, minus two, minus three, minus four. And all together, you can and the uh sum, which is 3.0625.
+
+[00:05:52] On the bottom is the general representation. You can treat everything as a integer and sum them up and shift it by 2 to the power of minus 4. So, shift it uh by the number of bits that is the fraction bit. So, you can get the exactly the same result using the second row and also using the fourth row. Okay, the next type
+
+[00:06:22] is floating-point number. This is very widely used in industry. Um it's highly possible when you are training the model you are using uh 16-bit uh BF16 these days. For a floating-point number, there are three uh kinds of bits. The first one is the sign bit. That is um to the to the very left. Followed by 8 bit of exponent bit.
+
+[00:06:53] Followed by 23 bit of fraction bit. So, 1 + 8 + 23 altogether that's 32 bit. The fraction bit is also called the significant bit or the mantissa bit. And how do we convert uh this binary into a uh into a number. So, the rule is um minus 1 to the power of sign indicating whether this is a positive or a negative number. So, that's the sign
+
+[00:07:24] bit. And then uh 1 plus the fraction bit. We have 23 for fraction bit to the right and 1 plus the fraction bit times 2 to the exponent bit minus 127. So, why 127? That's because we have uh s- we have 8 bit of exponent. So, 8 - 1 that's 7, and 2 to the power of 7 - 1 that's 127. So, let's use a real example to decode
+
+[00:07:57] um this representation. How to represent uh 0. 265625. So, we have to first formulate it as 1 um plus something, right? So, we have 1 plus um 0.0625. Okay? And what we also have to represent it by 1 plus something to the times 2 to the power of something. Okay? So, this is 2 to the power of minus 2.
+
+[00:08:28] And what is the bias here? The exponent bias on the top right corner is actually 127. So, 125 minus 127 equal to minus 2. So, the exponent bit should be 125. That's why we decoded the blue part should be 125. And the yellow part the the fraction part should be 0. uh 02 0.0625. So, I always have to um decode it by
+
+[00:08:59] formulating it as um minus 1 to the sign bit plus times 1 plus fraction bit times 2 to the something minus a 127. A key question is in this case, how do we represent zero? Because you have 1 plus fraction. And it's hard to represent zero in this case. So, we have another range called subnormal number. So, to the left, those
+
+[00:09:30] are normal numbers where the exponent uh exponent bit in blue doesn't equal to zero. On the right-hand side, we have the blue part, which is the uh um the exponent. They are all zero. They are fixed. They are fixed to be zero. Okay? In this case, those are exponent numbers. So, the exponent uh in the subnormal range, the representation is different.
+
+[00:10:00] You can see there's no one plus fraction. Okay? Used to be one plus fraction, but now it's just the fraction. Okay? -1 to the power of sign bit times fraction and times uh 2 to the power of 1 minus uh 127. So, this part the exponent part is also fixed uh 2 to the power of 1 minus the bias. And only flexibility The only flexibility is the uh yellow part, which is a fraction bit.
+
+[00:10:32] So, in this case, we can actually represent zero. Like zero could be 0 * 2 to the power of 1 uh 2 to the power of minus 126. So, let's do exercise. What's the smallest positive uh subnormal value? So, first of all, it's a sub subnormal value. Uh therefore, all the exponent bit all the eight bit in blue has to be
+
+[00:11:03] zero. And we are using the uh second representation, which is what -1 to the power of sign times fraction times 2 to the power of 1 minus bias. Okay? So, the smallest one uh we set um the fraction to be um minus 23. Um since we have 23 uh fraction bit, so the
+
+[00:11:33] smallest one is 2 to the power of um minus 23. We are setting the last bit. The last bit to be one, that's the smallest we can get using the yellow part. All together there are uh 23 uh yellow fraction bit. So, for that one um is 2 to the power of minus 23. And the exponent is forced to be zero due to this is a subnormal number.
+
+[00:12:03] >> [snorts] >> Um so, the right-hand side is 2 to the power of 1 minus the bias, so minus 127. So, the smallest number is 2 to the power of minus 149. What about the largest positive uh subnormal subnormal value? So, here we make every bit to be one in
+
+[00:12:33] the yellow part. Uh so, we are summing them up 2 to the power of minus 23, minus 22, all the way to minus one. So, that's 1 minus 2 to the power of minus 23. And the blue part is fixed, so we have 2 to the power of minus 126. So, the largest value is uh on the right-hand side 1 minus 2 to the power of minus 23 times 2 to the power of minus 126.
+
+[00:13:11] There are three special representations here. Uh there's positive infinity. There's negative infinity. And also not a number, NaN. Usually when you are training models uh the worst thing to observe is a NaN, meaning something went wrong. But, let's dive dive deeper. What exactly is a NaN? How is that represented? This is probably um very intriguing to all of us. So, to represent positive infinity, um
+
+[00:13:43] we are forcing all the eight blue exponent bit to be one. Okay? Remember, when they are zero, they are subnormal numbers. Now, when they are one, they are uh positive infinity numbers. And if it is negative infinity, we just uh have the sign bit to the very left have the sign bit to be one because it's a negative number. You tell me, could you help me with the camera? It doesn't
+
+[00:14:14] Okay, there we go. It it Okay, so let's go continue with the um not a number. Um also, the um all the blue part has to be has to be one. Um So, for subnormal numbers, ex- exponent need to be zero. And um if all the blue blue part uh is one, then it's a uh not a number. So, we have uh several cases, uh in
+
+[00:14:46] summary, uh right here. We have the exponent bit, fraction bit, and um there are two cases for ex- fraction bit, they equal to zero versus they don't equal to zero. Um if the exponent bit is equal to zero, um then that's the subnormal range, okay? Um the equation for subnormal range is on the first row, um minus one to the power of a sign and a fraction, not one plus fraction, but just fraction. Uh and times one not two to the power of
+
+[00:15:17] one minus the bias. Um if the exponent is not zero and is not a one, then that's a normal range. In the normal range, the representation is one plus the fraction. And the the remaining is the same. Well, if the exponent is a one, so it's FF, since we have eight bit, FF means it's a one. Um if the if the fraction bit um is zero, then it's um positive or negative infinity, depending
+
+[00:15:49] on the sign bit. If the sign bit is uh is one, then it's minus um it's negative number, it's um negative infinity. If the sign bit um it is it is zero, then it's a uh positive infinity. Well, if the fraction bit doesn't equal to zero, like right here on the right-hand side, if the uh yellow part doesn't equal to zero, then it's a not a number. So, this is a representation, and uh you
+
+[00:16:21] can see the subnormal values, they are usually in the smaller they are usually smaller. And the normal uh values, they are usually bigger. And these are the smallest. These are the range for these two um subnormal versus normal values. So, now you'll finally get an idea what is a NaN uh how is a NaN represented. Okay, so um you have the all the exponent bit need to be one, and the fraction bit need to be non-zero.
+
+[00:16:54] So, we have different sizes, different lengths of uh floating-point number. Just now we represent represented uh IEEE FP32 using 32 bit to represent a floating-point number, uh which has eight bit of float of exponent, and 23 bit of fraction, and totally you have 32 bit, considering the sign bit. We can also make it shorter using only 16 bit, which is two bytes.
+
+[00:17:25] Uh in this case, uh we have a lot smaller exponent bit, only five bit of exponent bit. Well, we have 10 fraction bit, and all together we have 16. And later um Google Brain find actually uh we need more dynamic range, but we don't need that high precision. So, what do we need to do to increase the range, the dynamic range? So, which one matters more for the range, the exponent or the fraction?
+
+[00:17:56] The exponent, yes. It's two to the power of exponent. So, if you increase the exponent, then you can represent a much larger dynamic range. So, in Google uh BF16, Brain Float 16, uh they increased the uh exponent from five to eight, okay? You added three bit. There is no free lunch, so you have to re- remove three bits from somewhere else. So, they removed the fraction bit from
+
+[00:18:27] 10 bit to seven bit. And all together is still uh 16 bit. But now you have a larger dynamic range, since in AI model in training and inference, the range matters, the precision uh matters not as much. So, this is a very widely used uh format these days. An interesting point is for the uh BF16, the exponent bit is exactly the same as FP32. So, you can represent as big range
+
+[00:19:00] as a full precision FP32. Okay, so that's the uh normal commonly used methods. Let's do a few um conversions to deepen our understanding for different numeric data types. Okay, question. What's the following um IEEE um IFP 16 number in decimal? So what we want to convert from this binary to um
+
+[00:19:32] binary representation to um decimal representation. First of all, let's see the sign bit. We have um one over there indicating this is a negative number. What about the exponent bit? So it's 1 0 0 0 1. Um what is that in decimal? That's 17, right? 17. What about the bias? So here we have five expo- exponent bit.
+
+[00:20:06] 5 - 1, that's four. Okay? Um 2 to the power of four, that's 16. 16 - 1, that's 15. So the bias is 15. Okay? So we minus 15, so we get 17 minus 15, we get two. That's the exponent. Fraction. So it's 1 1 0 0 0 0. Okay, we have 10 bit all together. 10 two ones followed by eight zeros. Actually, um that's 0.75 because the
+
+[00:20:37] first one is 0.5. The second one is 0.25. Add them together, that's 0.75. So now we have the sign, the exponent, and the fraction. We can we can plug in to the equation. So minus 1 plus the fraction, okay? 1 plus 0.75 and times 2 to the power of exponent. Exponent is two. So that's minus 1.75 times 2 to the power of 2. So, you get
+
+[00:21:08] minus seven. You get the conversion. All right. So, let's do another inverse conversion. I'll give you a few minutes, maybe three minutes, to think about the question. What is the decimal 2.5 in BF16? And to help you prepare that, we already help you break it down uh using the equation um one plus something times 2 to the power
+
+[00:21:39] of something. So, I'll give you two minutes. Uh bring a piece of paper to figure out what is the green part, blue part, and the yellow part.
+
+[00:22:30] Okay, let's work on it together. So, first of all, this is a positive number. So, the sign bit uh should be zero. It's a positive number. And then, for the eight-bit of exponent, right? So, BF16 we have eight-bit of exponent. Um so, that's one plus 127 because the bias equal to since we have eight-bit, right? To So, eight minus one, that's seven. 2 to the power of seven, that's 128 minus one, that's
+
+[00:23:01] 127. Everyone following that? So, 2 to the power of 7 minus 1. So, the bias is 127. Um and then um the binary should be 1 plus that. So, that's 128. 128 is exactly the first one is 1 followed by a bunch of zeros. So, we complete the green part and blue part. Let's do now do the yellow part. The 7-bit of fraction. We have to
+
+[00:23:32] represent it by um 1 plus something. And that something we already did it for you, that's 0.25. And 0.25 um the first one is 0.5, the second one is 0.25, right? That's why that's why we have in the blue part the second first one is zero, the second one is one, that's 0.25. A easy number. And at the bottom so as finally we can get the uh representation in BF16.
+
+[00:24:08] Okay, so we have more um numbers in this family, right? We have FP32, we introduced uh FP16 and also BF16. We also did a conversion as an exercise. Um Nvidia uh went one step further. People are not satisfied with 16-bit. They want to go even lower to four uh to eight-bit. Can we do with eight-bit? So, Nvidia proposed these two formats. One is Nvidia's FP8 E4M3.
+
+[00:24:41] Uh four mantis uh four exponent bit in blue and uh three mantissa bit. And also Nvidia FP8 E5 M2. So, we have five bit of exponent, that's why it's called E5, and the M2 two-bit of exponent of mantissa bit. And this is obviously have larger dynamic range because you have five bit of exponent
+
+[00:25:12] give you a larger dynamic range, which is very useful during training. Uh for the gradient, you want to um represent very big numbers, very small numbers. So, that's why there are two format, E4M3 and also E5M2 considering the different phases, one is inference, one is training, uh require different dynamic range. So, nowadays FP8 is very popularly used uh including attention mechanism. There
+
+[00:25:43] are so many libraries uh dealing with FP8 attention, FFN layers. But people are not satisfied with that. We want to go even lower, okay? Integer four and FP4 using only four bit to represent a number. Both weights and activations um can be represented in four bit. And some of the models like um GPT-OSS or Kiimi, lots of the open source models these days are open source natively using only four
+
+[00:26:15] bit. So, below are four representations. Since you have only four bit, uh there's not much room to play with. You have the sign bit, the exponent bit, the mantissa bit. You can have one sign bit and three mantissa bits, so that's basically int four. That's the very top representation. There's no exponent bit, so uh that's the simplest, basically that's int four. And it can represent 0 1 2 3 4 5 6 7.
+
+[00:26:50] Also, that's on the positive side. On the negative side, you can represent minus one all the way to minus eight. Since we have only three bits to allocate for exponent and mantissa, you can either have zero plus three, which is the first case, zero exponent bit, three mantissa bit, or one plus two, which is the second row, or three plus one, or two plus one, or three plus zero, okay? Is the second method useful?
+
+[00:27:22] If you have only one exponent bit and two mantissa bit. It's actually not useful because that's the same as the first one. Um it's still linear. Um if you see the um distribution, um you can represent zero, one, two, three, four, five, six, seven, and minus um one, two, three, four, six, seven, and you just multiplied it by 0.5. It's scaled by half, but actually the
+
+[00:27:53] distribution is the same as the integer representation. Plus, you lose one slot for zero. You have a duplicated zero, but you lose minus eight. So, the second solution is not good. The fourth uh the third one is good. Um E2M1. You have two exponent bit and one mantissa bit. Um so, you can see the distribution is um narrower and and squeezed all together in the first uh couple of centries, like
+
+[00:28:24] zero, uh 0.5, one, and two. And then it begin to scatter uh two, three, four, and then even scattered to six. It's getting larger and larger. This actually fit quite well with the neural network weight distribution, where it's getting very concentrated uh during the small range, and then a bit um diverse diverged um far far apart from each other as the value gets bigger.
+
+[00:28:54] Of course, you can have the last one which is E3 M0. Everything is exponent. There's no mantissa and you can have the largest dynamic range. And you can see it's it getting even more scattered during the large area. So the difference the distance between small and big is getting more aggressive. So that can represent 0 1 2 4 8 16 32 64. That's basically the effect
+
+[00:29:27] of having all all the bits to be exponent bit. A question. The intuition. That's a good question. So you want to see the distribution of the weight and activations. So if you have this normal distribution, right? Where the weight is very concentrated when the value is small,
+
+[00:29:57] then you want to have it have the centroid also to be closer. Which fits well with the last one and the second to the last one. Since the more concentrated you are, the more fine grain you want to represent those values. And during the small value like 0 and 1, those places they're very fine grained. And if you go further to the right, they become coarse grained. That fits quite well with the actual weight distribution
+
+[00:30:30] which is like a normal distribution. All right. So let's take a break before we dive deeper into the quantization techniques, let's take a 5-minute break. All right, welcome back. Let's continue the discussion about quantization. Just now we we spent half the lecture introduced the number representations. These are actually getting quite crucial. You may heard many startups
+
+[00:31:02] these day come up with like one-bit network, two-bit network. You may wonder where they are. Actually, those are some of the innovations in this direction. So, quantization is the process of constraining the input from a continuous space into a set of discrete discrete space. Converting a continuous signal into a discrete signal. And you can use a coarse-grained codebook to represent those values. We
+
+[00:31:32] are going to introduce three types of quantization from starting from the original one, which is the floating-point weight and floating-point arithmetic. Everything is floating-point. That's the original full-precision representation on the top-left corner. The first one we are going to introduce is the K-means based approach. So, you can use integer weight and floating-point codebook. Which is storing the index into the
+
+[00:32:03] codebook. But you have to use the floating-point arithmetic since ultimately you have to decode the weight into floating-point. So, this is example. Let's dive deeper into that. You have 4 by 4 matrix 2.09 0.98 etc. So, these are the 32-bit weight of a 4 by 4 matrix. In deep learning, you don't need a high precision. If one weight is 2.09, one is 2.12, you can just use two to represent
+
+[00:32:34] both of them. And 1.92 1.87, you can just represent everything into uh by uh two. So, how we do it? We just do uh K-means uh quantization, cluster the similar weights all together. 2.09, 2.12, 1.92, and 1.87. Those are the blue weight. They are very similar to one. So, we cluster them uh together to uh the first centroid, which is two.
+
+[00:33:06] The second weight, which is 0.98, the green weight. That weight is very similar to -1.08, uh 0. -0.91, 10 -103. So, we cluster them together, all the way everything to be clustered to to -1. Uh and we store the index of that, which is uh zero. So, I have three uh we have actually four uh different choices. -1
+
+[00:33:38] in green, uh orange, zero, red, 1.5, and blue, two. So, we are actually storing the index of the codebook for each value. For example, on the top left corner, the 2.09, that's blue, and that's the third centroid. That's why we are storing three on the top left corner. On the bottom right corner, let's see another example. On the bottom right corner, what is the original weight?
+
+[00:34:09] 1.49, right? And it's closer to 1.5. Where is 1.5? That's the second entry, 0 1 2, second entry in the codebook. Therefore, we are storing two in the bottom right corner. So, using this representation, we can reconstruct the original weight. So, uh using the index into the codebook, we can recover the uh 32-bit floating-point.
+
+[00:34:41] Uh of course, there is some quantization error because 2.09 now becomes two. You have 0.09, that's the quantization error, which is the bottom left right corner. Uh this is the subtracting the representation versus the original uh weight, you get this error um quantization error matrix. So, originally, how many bit do we need to store? We have 32 bit for each weight. We have 16 of them. So, all together,
+
+[00:35:13] 500 and 12 uh bit, 64 bytes. After the K-means quantization, we have two part. One is index, right? Two bit each. Since we have a four entries, to represent four entries, we need two bit. And we have 4 by 4, 16 of them. So, 2 * 16, that's 32 bit, 4 byte. Is that all? No, we also have to store the codebook, exactly.
+
+[00:35:44] For the codebook, it's full precision for each value, 32 bit, and we have four of them. So, all together, we have 128 bit. That's 16 byte. So, how much do we need in total? 4 byte plus 16 byte, all together 20 byte. And how much do we save? That's 3.2 times smaller. What if the matrix is super big? Actually, the the size of the codebook
+
+[00:36:15] stay the same, and the second second part, the 32 bit times four can be ignored. So, assume N-bit quantization, and the the of parameters in the very big matrix, is much uh bigger than 2 to the power of n, then the first term in the first uh first case without quantization, that's 32 m bit. In the second part, um there's m bit if you quantize to m bit, and there are m of them, that's n * m, and then you have a
+
+[00:36:46] codebook, each entry is 32 bit. You have 2 to the power of 2 to the power of n entries, n equal to 2 this case. So, you have um 2 to the power of n + 1 bit, n + 5 bit. And when the m is pretty big, the number of parameters is pretty big, the second term can be ignored, the size of the codebook can be ignored since the size is irrelevant about the matrix. So, you divide um 32 m divided by n n *
+
+[00:37:18] m, you have 32 time uh divided by n times smaller. So, if n equal to um 4 bit, then you have eight times smaller. Uh how do we uh fine-tune a model that is K-means quantized? Uh first of all, question.
+
+[00:37:54] Oh, that's a good point. So, you have to look up. You have to do indexing. That one is not negligible. We need to prop properly um accelerate that using the smart data path. Otherwise, it's random access could be expensive. Good point. And that's a good question because you always need algorithm and system and hardware co-design to realize the measure of the speedup. Okay, let's continue. So, how do we train a model that is
+
+[00:38:26] quantized using K-means clustering? For example, you get the gradient matrix. What is the dimension of the gradient matrix? It's the same as the original matrix. So, it's 4 by 4. And you color them using the same pattern as the weight, the blue, the green, the orange, etc. And you cluster them and you reduce the weight by summing them up. Summing similar color, so summing the same color together.
+
+[00:38:57] And multiplied by the learning rate and then subtracted from the original centroid. So, basically we are pushing the Some of the weight are pushing this way, some of them are pushing that way. You just sum them up. For everyone that's pushing the same centroid, uh multiply by learning rate and subtracted from the original centroid. And that completes one iteration of SGD. Okay, so how do we
+
+[00:39:27] lose how much accuracy do we lose after quantization? And can we combine them together with pruning? So, here we are showing um what's 10 years ago you do in my deep compression paper. From 20% you lose nothing. It's quantization only. Until you go about 8% of the model weight, you start to lose accuracy. That's quantization only. With pruning only, you also lose accuracy roughly around 10% or 8%.
+
+[00:39:58] But if you combine them together, you do pruning and then quantization, you can actually do a lot better. Pushing the um pushing the compression ratio to a lot smaller, around 3 to 4% before the accuracy starts to drop. So, this figure shows actually it's beneficial beneficial to combine pruning and quantization uh together. They can work better than doing them individually.
+
+[00:40:31] So, let's see the weight distribution. Um before quantization, you have the continuous weight. And why we are having a big um dip in the area near zero because they are pruned. Everything small small weights are pruned away. So, before quantization, you have continuous weight. And after quantization, you have discrete weight. This is continuous. This is great. This is discrete. Easily see the difference.
+
+[00:41:02] What about after retraining? What happened to to these centroids? Actually, they have very subtle movement after quantization and retraining to adjust themselves um to recover the accuracy. So, you can tell there are still um the same amount of uh centroid, but they are uh shifted a little bit. And how many bits do we need? From these two figures, the left one is
+
+[00:41:34] the convolution layer. The right one is the fully connected layer uh for AlexNet. For for conv layer, roughly you can quantize them to 4-bit before you lose any accuracy. And for FC layer, they are more robust. You can go all the way to 2-bit without losing accuracy.
+
+[00:42:10] Oh, actually no. Uh because we are directly retraining with the quantization. Um cuz the weight is already clustered into four clusters, right? And the weight uh the gradient, you get a a real uh floating-point IP32 gradient. Uh you also cluster them together. You get the delta of the centroid. And the original centroid, delta centroid, multiplied by the learning rate, subtracted from the original uh centroid, that's how we perform
+
+[00:42:40] uh this K-means quantize the fine-tuning. It's a little different. All right. Um the last technique in deep compression is Huffman coding. Since the distribution is not even, some of them is very concentrated, like in this case, the distribution is very concentrated around nine and and 19. So, for those frequent weight, uh we we want to use less bits to represent.
+
+[00:43:12] Fewer bits to represent. And for those infrequent weights, um we can afford to use uh more bits to represent. So, that's the uh intuition of Huffman coding, um using variable number of bit to represent the number. Putting them together, that's the pipeline of deep compression. So, you are you are given a model, your boss want you to deploy it on a resource-constrained device. You can apply this three-stage pipeline to
+
+[00:43:42] compress it, prune it, and then quantize it, and finally, Huffman coding. Okay? Pruning, quantization, Huffman coding. For pruning, you first uh train it once to get the connectivity, prune the connections, and train the remaining remaining weights, and iteratively do this process. And after that, you can get about 9 to 13 times, roughly 10x, reduction of the model size without hurting accuracy. And the second part, you want to do the K-means clustering, the quantization.
+
+[00:44:14] You can cluster the weight, generate a codebook, and quantize the weight with the codebook, and retrain the codebook. You can do this process iteratively. Then you can get the model size reduction from 27 to 31 times. And finally, you can encode the weight, encode the index using Huffman coding, using more bits for those frequent uh appearing weight, and for using um um using more bits for those less frequent
+
+[00:44:45] appearing weight. And using fewer bits for those very frequently appearing weight. Yes, that will make the hardware a lot harder to process because the regularity is a lot poorer.
+
+[00:45:18] Oh, that's a good question. So, should we do pruning first or quantization first? So, if you do quant- uh pruning first, you already removed a lot of redundant uh weight, right? So, during quantization, you are only left with those useful weights to quantize them. So, making the quantization uh faster. And also, um for if you quantize them, it's very very likely it's a much harder to fine-tune, right?
+
+[00:45:50] So, since you are concentrated with a few centroids, you can only move those centroids. Versus uh and if you prune on top of it, you may lose some important centroid and harder to recover because the remaining centroid uh is very limited. You have limited capacity to fine-tune from the accuracy loss. Well, with all the parameters before uh quantization, even some of them is pruned, you still have a lot of flexibility, full flexibility to fine-tune uh the remaining weight. So,
+
+[00:46:21] it's a lot easier to recover the accuracy. So, the industry these days is popular to um to the pipeline is usually distillation first and then pruning and then quantization. So, let's see how much we can uh compress how much compression ratio we can achieve for these popular networks. It ranges from 10 to about 40 times um compression ratio uh without hurting the accuracy. So, there's a lot room uh
+
+[00:46:53] you can exploit. You can notice some of them have uh smaller compression ratio. That's due to we can actually uh make compact models. If the model is very compact, you have a smaller compression ratio, um but you can make it a lot more efficient to begin with. So, can we make compact models to begin with? Actually, yes. Um so, 10 years ago, in collaboration with Berkeley, uh we designed the SqueezeNet. So, with the input, first you use 1 by 1 conv to
+
+[00:47:25] reduce the channel from 64 to 16, and then you have two branches. One is 1 by 1 conv, the other is 3 by 3 conv, uh and then you expand the channels to 64. Um so, using this architecture, we can repeat it many, many times. And actually, it can be combined with deep compression um to make it 500 times smaller than AlexNet. And the accuracy on the right-hand side is exactly the same. This is showing that the best approach
+
+[00:47:57] is to design an efficient model architecture to begin with, like the SqueezeNet architecture, and followed by the compression. So, to be small to begin with, and then further squeeze the model to make it smaller. Okay, so this is how we um um compute it uh in hardware. The weights are first decompressed using a lookup table uh code book. Um and then you still do the computation
+
+[00:48:28] in full precision. You save the memory movement, but you don't save the computation. The computation is still done in floating point. What if you want uh everything to be in integer, uh including the storage and also the computation? So, that's a linear quantization. Integer weights, integer arithmetic. So, let's go to the second part, which is linear quantization. This is super
+
+[00:49:01] widely used. If you have a hardware device uh on the edge, like a microcontroller, you may not have the luxury to have any floating point units, or if you have a FPGA or ASIC in low power, you may also on only have linear only have integer um arithmetic. So, how do we process neural network in that case? So, what is linear quantization? This is our familiar matrix, 4 by 4 floating point matrix.
+
+[00:49:32] Um we quantize them to integer value. Now, we directly operate on this integer value, rather than treating as treating it as index. Okay, so we first uh subtract the zero point, and multiplied by a scaling factor. And we will soon have the equation how to obtain uh the zero point and scaling factor by working on the distribution of the weight. And finally we can reconstruct the
+
+[00:50:02] weight. Okay, this is the linear represent this is the integer representation and we have a zero point, we have a floating point scaling factor, right? And we can recover the weight. And this is the on the top bottom top right bottom right corner that's the quantization error. So basically linear quantization is an affine mapping from integers to real real numbers. Affine mapping means it's
+
+[00:50:33] linear. So subtract and then multiply. You subtract the the integer by a zero point which is also an integer and finally multiply that with a scaling factor which is in floating point. So what is a zero point? So that's a quantization hyper parameter allow the real number zero to be exactly represented by a quantized integer. So there's no quantization error for Z. You
+
+[00:51:05] want to you want to have R equal to zero to be exactly mapped to a integer. So this is the affine mapping. The top row is the floating point representation from Rmin to Rmax and on the bottom is the integer representation from Qmin to Qmax. So Z is the zero point in the integer domain that exactly maps to zero. So for
+
+[00:51:37] zero there's no quantization error. It exactly map to Z. Here are a few examples of Qmin and Q max for two bit um Q min is minus two and Q max is one. Can represent four numbers. If the bit width is a four uh you can represent from zero minus minus eight to seven. In general, you have n bit you can represent two to the power of n minus
+
+[00:52:07] one to um two to the power of n minus one minus one. And how do we find uh the scaling factor? So uh this is our on the top right corner is our equation for the general case and we plug in those two special values. One is R max and Q max, R min and Q min. We can subtract them. The distance between R max and R min.
+
+[00:52:37] So that's the range of the integer part equal to a scaling factor of the distance between Q min and Q max. On the top, we have Q min and Q max. The distance is different. We use a scaling factor S to map them, which is a floating point number. So you can calculate S to be R max minus R min divided by Q max minus Q min.
+
+[00:53:11] This is an example. Okay, we have a 4 by 4 matrix. What is R max? The the largest number, which is that is 2.12 on the top right corner. What is R min? It's minus 1.08 on the top right corner. And how many bits are we trying to use? We have we are using two bits. So for uh two bits, Q max What is Q max? Largest one is one, okay? What is Q mean? The
+
+[00:53:43] smallest one is minus two. So now we have all the four numbers, Rmax, Rmin, Qmax, Qmin, which is plug in to the equation. Uh we can get the scaling factor is actually 1.07. Um this is a very important derivation. We are going to revisit this in the homework, in the lab. So make sure you are familiar with uh this process. So far so good? Everyone following me? Okay, good.
+
+[00:54:14] All right, let's continue. Now let's figure out the zero point. Remember I affine transformation, you have two parameters. One is the zero point, the Z on the top right corner. One is the scaling factor. We already figured out uh we already figured out how to calculate the scaling factor. Now let's figure out how to calculate the zero point. Again, this equation, we have Rmin uh equal to S times Qmin minus Z, then we
+
+[00:54:44] can easily calculate Z by rearranging the equation. So Rmin divided by S, and then use Qmin to subtract this value. And since Z, you can see on the zero point here, it has to be in the integer domain, right? So we have to round it to the nearest integer. That's why we have the round here. So remember Z is an integer, and S is a floating point scaling factor. Back to our example, plug in this
+
+[00:55:15] equation, Z equal to Qmin minus Rmin divided by S. And Qmin for two bit is minus two, and Rmin in the matrix, the smallest value is minus 1.08. We plug in the S as well. We calculated the S just now, which is 1.07. We can and then finally round it, Z equal to minus one. Okay, now we have learned both how to calculate the Z, uh the zero point, and also the scaling
+
+[00:55:47] factor. Let's see a real case, a matrix multiplication, Y equal to WX. And then we are going to add the bias, and then we are going to extend it to convolution. But now, let's first do quantize the matrix multiplication. We have three terms, Y, W, X. We expand all of them using the equation on the top right corner. For example, W equal to a scaling factor SW times the
+
+[00:56:17] quantized W, which is QW, minus the zero point of W, which is ZW. Okay? Similarly, for the X, we do QX minus the zero point times SX. Similar for Y, Y equal to quantized Y minus the zero point of Y, scale it by SY. And then we move SY to the right. We also move ZY to the right. You can easily get this equation on the second
+
+[00:56:49] on the third row. Here we have a matrix we have a multiplication. We can expand it to to four terms, okay? QX QW times QX ZW and QX ZX and QW and ZW and ZX. Let's continue. Uh we want to have n-bit integer multiplication, right? Uh so, how do we deal with uh this
+
+[00:57:20] middle part? And also the first part and last part. Actually, [snorts] the yellow part, they are all constant. Why they are constant? What are they? ZX the zero point of activation. You can precompute it. QW, that's the weight. You also know it at compile time. ZW, uh zero point of the weight, know it at compile time. ZX, you can know it at compile time
+
+[00:57:51] by uh learning the distribution. So, those are constants, yellow part. How about the blue part? So, empirically, so deep learning is engineering, it's not science. Empirically, um this is always in the interval of zero to one. If it is zero to one, you can apply engineering trick to represent it by two to the power of minus n times um zero. Um zero ranges between 0.5 and one. And in PyTorch, you can easily uh do
+
+[00:58:22] such conversion. If a number is between zero and one, you can easily convert it into a number shifted by uh n bits. So, we are not worried about uh the first term at all because we can do shift. Shift in hardware is very easy to implement. And the remaining uh [snorts] um zero is a n-bit integer. So, the first term, the scaling factor, you can do uh integer multiplication
+
+[00:58:54] followed by a shift. Uh the second part is n-bit integer multiplication and uh accumulation using 32-bit integer addition. And last one, you can do in n-bit integer addition. So, everything is integer. What about the uh the green part? So, ZW If you plot the distribution of the weight, so, this is the distribution of the weight, is they are centered around zero. Okay?
+
+[00:59:25] So, they are symmetric and normal distribution mean is roughly zero. So, we can set Zw to be zero. So, the first part is the general case. The second part is the Zw equal to zero case. So, zero maps to zero because the weight distribution is non The weight distribution is symmetric. So, if that is the case uh we can simplify uh the equation uh
+
+[00:59:56] because here Z becomes zero. And what is Q mean? For n-bit Q mean equal to 2 to the power of n minus n minus 1. In that case, we can uh further simplify that by plugging Zw equal to zero because the weight is symmetric and then we can get rid of the blue green term and also the last term where uh Zw is there. Now, we are having the uh
+
+[01:00:28] simple uh solution here. The Qw and Qx, they are both quantized to integer. So, this is a integer multiplication. And Zx Qw, you can compute it as a constant integer constant precomputed. Um and minus that can be done using 32-bit integer subtraction and shift and integer add. So, everything is in the integer domain now. So, that's Y equal to WX.
+
+[01:01:01] Y equal to WX plus B, that's very similar. So, let's add by add this bias and see what we get. The first few terms are the same as before. Now, we just add a new term Sb uh the scaling factor of B times Qb minus Zb. Z is the scaling factor. Since ZW is a zero, so the weight distribution is symmetric, we can simplify by plugging ZW equal to zero.
+
+[01:01:33] Now, we have two different scaling factors, SW SX, and SB. Since ZB, which is also can be zero because it's the distribution of the weight and bias, they roughly are symmetric, so we can you already set the ZB to be also zero. So, now we are left with only SB times QB. And we can set SB to be arbitrary because they are you can shift the result A times B, you can always scale A
+
+[01:02:05] up and scale B down, so the result is the same. So, now we set SB to be SW times SX. Now, we can uh simplify it by having SW SX in the beginning, and we merge QB into here. And those are the assumptions. ZW equal to zero, ZB equal to zero because they are symmetric. And the SB we set it to be SW times SX. We are left with this equation.
+
+[01:02:37] We move SY to the right-hand side and plug in uh ZY. And QB minus uh ZW uh ZX QW, they're all constants, they can be precomputed. We can call it Q bias and plug that in, we can have everything now. So, this is what we have for the general um WX plus B. The middle part, blue and yellow, can be
+
+[01:03:09] done in N-bit integer multiplication and and a 32-bit integer add and shift and scaling and the end bit integer add. So, everything is done in the integer domain in this case. You can also replace that from matrix multiplication into convolution. We'll ignore or we'll skip the derivation process, but it's very similar.
+
+[01:03:39] Both convolution and matrix multiplication are linear, so the derivation process is very similar. I can do a integer convolution between QX and QW, the quantized W and quantized X. Add the bias, scale it, add the bias in the end. Everything is in the integer domain. So, this is the data flow on the right-hand side. You have the quantized
+
+[01:04:09] the input, you have the quantized the weight. You first do a convolution, and then you add the quantized the bias, the Q bias, and then you multiply with the scaling factor. Actually, that could be done in a shift. Finally, you add the add the zero point ZY, you get the quantized output QW. All right. So, how much gain do we have after this complicated math derivation?
+
+[01:04:40] So, accuracy-wise, we can fully recover pretty much recover all the accuracy for ResNet-50, Inception-v3 with a floating point versus integer. This result was in 2018, but nowadays people can do do a lot better using FP8 and even FP4. On the right-hand side is showing the trade-off curve between latency and accuracy. So, you already higher accuracy is coming at the cost of higher
+
+[01:05:11] latency but here using the 8-bit integer with the same latency you can see the higher the accuracy is higher. Or with a similar accuracy, the latency is lower. Okay, so for summary, we talked about how to map a floating point uh matrix into integer. So there are two ways of quantization. One is integer one is K-means quantization. You have a
+
+[01:05:42] integer weight but floating point codebook. The computation is still done in floating point. You save the storage but you don't save the computation. The second part, you are saving both the storage and the computation by integer weights and integer arithmetic. And what is the next step? We are going to talk about uh binary and ternary quantization in the next lecture. So today we
+
+[01:06:13] uh learn about the numerical data types. What is integer? What is floating point 32? Half precision? IEEE 4? What is actual? What is mantissa? What is exponent bit? And we talked about uh neural network quantization, K-means quantization, and linear quantization, and how to derive the the bias and also the scaling factor. So lab one is out uh today. Uh I highly encourage you guys to check it out. We'll also put it not only on
+
+[01:06:44] Piazza, but also on our uh course website. So uh take a look at our course website. And if you have any questions, feel free to uh go to the um office hours, okay? And also uh ask questions on Piazza. So this is our course website. efficientml.ai. We have all the logistics on the website. Here are our TAs and instructors.
+
+[01:07:14] And on the right-hand side, you can see the logistics. Lab zero is already out. It's due next time. And lab one will be out. We'll post it very soon. So, you can reference our class website using efficientml.ai. Very easy to remember. Okay, that's all for today's lecture. Thank you, everyone.

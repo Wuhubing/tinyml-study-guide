@@ -1,0 +1,234 @@
+EfficientML.ai Lecture 7 - Neural Architecture Search (Part I) (MIT 6.5940 Fall 2026) [lPKZZyQxQXY]
+Source: https://www.youtube.com/watch?v=lPKZZyQxQXY
+Language: English
+Transcript source: YouTube automatic captions; unedited.
+
+[00:00:04] All right, welcome everyone. Let's get started with efficient ML.AI lecture number seven. Uh so today we are going to talk about neuro architecture search. Uh we will have two lectures about new architecture search. So this is the first part of it. We are going to continue talk about it in uh next Tuesday. So efficient AI design is always about trade-offs. um there's a trade-off between the latency, the energy, storage and accuracy. You cannot get the best of both world. So we are trying to optimize is to understand deeply what each each
+
+[00:00:36] aspect uh implicates and try to find the prior to optimal curve among these trade-off. So first of all latency. So that concerns the speed how much how fast the model can run. uh for example in large language models you care about the time to first token and you also care about the throughput. So the time to first token means after you input a prompt how soon how long does it take for the large language model to return you a a result
+
+[00:01:09] and and also you care about the throughput the tokens per second like whether it's giving many tokens very fast or slowly one by one. So that's the throughput uh and usually um higher throughput is desired and also lower latency is desired but usually that comes at a cost of higher memory usage and also higher energy. So for example you want to um have a big model usually you can have good accuracy
+
+[00:01:39] for example that's switch gear to a storage but you have a very small model it's unlikely to have a very big accuracy unless you do a lot of tricks and storage these days matters because um both on the cloud and also on the edge on the cloud you have to fetch the whole model right you have to store all the weights and for large language models to do decoding uh when you are predicting a two token you have to fetch the entire weight right to generate one token that's very memory expensive and
+
+[00:02:12] if you can reduce the model size that reduce this number of parameters reduce the precision you can reduce the storage requirement and also that reduce the memory requirement uh when generating each token so storage also matters not only on the cloud but also on edge device for example Tesla want to do overthe-air update uh if the model is is big that consumes a lot of LT bandwidth and also a mobile phones if you were to design a mobile
+
+[00:02:43] app and the mobile app is is big then you can you can probably only download it via Wi-Fi so model size matters storage matters the next point is the energy um on the right hand side that also matters a lot both on the edge and also on the cloud so on the cloud uh you know Jensen's five five liter cake of AI the bottom line bottom part is electricity right you need a lot of electricity um one gawatt several
+
+[00:03:15] hundred million watt to build a big data center to have lots of GPUs over there um that also have lots of environmental um impact so you want to really improve the energy efficiency try to produce as much as tokens as possible uh given the fixed amount of energy and power. Cooling is also an important aspect of it. Water cooling is expensive. So energy matters a lot on the cloud. Also on the edge um those AI algorithms
+
+[00:03:48] might quickly drain your battery, right? You don't want your phone to die very quickly. So you want to have a um energy efficient computing on edge devices. A lot of the time you cannot afford a big chunk of battery in the in the back of your car. So, uh efficient computing on robots on self-driving cars, the energy efficiency matters a lot. Uh finally, accuracy, right? We spend so
+
+[00:04:18] much effort just to increase the accuracy by a few percentage points from the next generation to the next next generation. You don't want to hurt the accuracy although you are making it fast but if the accuracy degrades uh people are not going to use it. So uh it's super critical to maintain the accuracy while we are optimizing for latency memory storage and energy.
+
+[00:04:49] Okay. So given that goal we want to achieve that by neuro architecture search. So what's the relationship between neuro architecture search to what we have learned so far? We have learned about pruning, right? Reducing the number of connections, reducing the number of activations uh to save the memory, save compute. We also talk about um reducing the precision, the width of each number, right? Those are assuming the model is the model, right? You're keeping the same architecture, right? pruning some of the
+
+[00:05:21] weight, reducing the precision. But how about if we have the luxury to design the model architecture from scratch? That is a new architecture search. How to design the architecture of the model um that is both fast uh energy efficient and also accurate. So in order to achieve that we first talk about primitive operations convolution depress convolution transformer attention uh those building
+
+[00:05:52] blocks and we try to put put together those building blocks arrange that uh size them um that is new architecture search. Okay, we introduce the uh search space, how to define the search space um and also how to design the search space and how to uh design a search strategy. So this is today's lecture. In next week's le lecture we'll talk about efficient and hardware aware architecture search like performance
+
+[00:06:24] estimation strategy hardware aware NAS including the recently how to apply that to large language models zero short NAS and neural hardware architecture co search and talk about a few applications applying NAS to NLP to GANs point cloud and post estimations. So let's start with uh designing uh primitive operations. So this is recap what we learned so far about the primitive operations. Starting
+
+[00:06:55] with fully connected layer or the FC layer. So on the top right corner is a classic FC layer. It has N input batch size is N and the input channel is CI. The output channel is CO. So the matrix is CI * CO. So the input feature dimension is N by CI. You have N rows and CI columns. The output feature is also N rows uh CO columns. And you apply the weight um matrix CO by CI to
+
+[00:07:27] transform CI into CO. And you also have a bias which is CO. Since we care about the memory, we care about the compute. So this is the MAC for linear layer. It's just CO * CI to do the matrix multiplication. We also talk about the convolution uh primitive. So this is the 1D con versus 2D conf where uh for 1D conf
+
+[00:07:57] is the batch size and CI and wi is the dimension of the input feature. And also for 2D convolution um you not only have uh the channel CI but also you have the uh H and W the height and width dimension. So altogether it's a four dimension uh feature map. You have the H you have the W you have the channel input channel you al also have the N which is the batch dimension.
+
+[00:08:28] Uh for output feature it's also four dimensions. is HO time WO and CO and then M and the weight dimension is the kernel size which is KH time KW. You also have the input feature dimension CI and the output feature dimension which is the CO. So that's why it's also a fourdimensional uh feature although it's 2D convolution. And finally you have a bias one bias per output channel. So al together you have
+
+[00:08:58] how many co uh bias numbers and as a recap you may have done this in the first lab for convolution the mac is multiplication of these six terms. Okay you have c i and co you have kh and kw you have also have the uh h and w. So how do we reduce the number of operations in convolution? A good method
+
+[00:09:32] is using um grouping. Okay. So this is uh without grouping. The second part is with grouping. What is the group size? We have group size of two. So the channels within the group communicate with each other and the channels between groups doesn't communicate with each other. Okay. Um so how much compute do we save in this case assuming the number of group is g equal
+
+[00:10:03] to two in this case. So the weight dimension you can see um the channel number is reduced by g. So for both input and output we have rather than CI and CO now it's CI divided by G and CO divided by G right but we have G times more kernels right so al together it's G times CO divided by G and CI divided by G so you save G times in this
+
+[00:10:37] case you save two times not four times right okay so the group convolution you save the computation by G * divided by G. Consider a special case. What if what is the maximum number of G? You have C channels and the largest G would be equal to C, right? So if um every channel is independent um you have the maximum amount of groups
+
+[00:11:10] where the input group input channel and output channel are the same. Then the max number of G is C. So each layer each channel is independent uh just like like here on the right hand side. So the weight dimension is three dimension in this case rather than four dimensions. It's KH and KW time C. Okay. So uh it's mapping the input channel one to one uh to the output channel. So each kernel just work on one channel mapping
+
+[00:11:40] the input channel into the uh output channel. What is the computation complexity for this case? So that's uh CO time KH KW and H and W. So that's steps wise convolution. And finally uh if the kernel size the kh and kw equal to one the six dimension u becomes only four because k equal to one. So the computation flops in this
+
+[00:12:12] case would be co * ci * h * w. Okay. Having reviewed those basic operations let's use those operations to set up building blocks. A classic building block is the bottleneck block. Okay, what is a bottleneck block? Say you have 2k dimension as input and you want a 2k dimension as the output. Uh how do you assemble uh those convolution in the middle?
+
+[00:12:44] You have one by one, you have 3x3. The majority of the computation is in the 3x3 convolution, right? So in order to have less computation you want to first shrink the number of channels right by this one by one convolution that shrink the channel from uh 220 u 2000 to uh 512. Therefore the 3x3 convolution can operate at a much smaller uh channel
+
+[00:13:14] dimension which is tw 512. And finally you need to uh expand the number of channels to the same as the input. So the input channel and output channel stay the same. That's why you can have this bypass layer. So what is the MAC in this dimension assuming the uh height and width is H and W. So six terms right. So input channel uh 2k output channel 512 H and W kernel
+
+[00:13:46] size is 1 by one. So that's for the first layer. How about the second layer? Input channel is 512 output channel is 512 H and W kernel size is 9. So you put them together is 5 512 512 HW and 17. What if we um have just one 3x3 convolution to map the 2k input to to 2k output that would have been 2k input by
+
+[00:14:17] 2k output time h * w * 9 that would be a lot that would be actually uh five 8 time 5 8.5 times more compared with this bottleneck block right so those are some of the princip principles. Although convolution neuronet network uh has been gradually evolved these days people are using transformer a lot but this kind of principle like uh dimension reduction uh
+
+[00:14:48] projection is actually widely used widely um influenced the uh efficient architecture design such as the deepse models right you may um experienced uh one year ago like spring 2025 deepse just came it's a a lot more efficient compared with other models uh inspired a big splash in the market. Actually lots of the uh projection and low dimension and uh saving the computation keeping the same uh dimension those ideas um
+
+[00:15:21] actually are born from this kind of primitive study. So highly recommend we just um uh train your um your personal uh model to um get a taste get a taste how to reduce the computation when you are designing those primitives. So um bottleneck block. All right. So can we do further right? Can we further reduce the uh computation?
+
+[00:15:51] So 3x3 convolution is really uh the bottleneck here. Just now we reduce this bottleneck by shrinking the dimensions. How about another dimension? Can we use group convolution? So for the middle 3x3 convolution. Now let's have group size of 32. This actually later we have a grouped attention mechanism. So everything is um transferable. So uh let's continue the
+
+[00:16:22] discussion. So rather than just one 3x3 convolution now we have 32 of them. Each of them is independent uh but later you can concatenate them together. So as we learned in the computation of group convolution you can reduce the uh computation by G times. G is the number of groups. And now you can still have uh this bypass layer. And then you can also have this separate one by one convolution at the end and add them add them up in the
+
+[00:16:53] very end. Uh can we go to the extreme right we learn about the dep wise convolution where g equal to c and input channel equal to output channel ci= to co equal to c. So that's the extreme case of group convolution where the group number equal to the number of input channels and we use the depth convolution to capture the spatial information to convolve in space spatial dimension and
+
+[00:17:25] use the one by one convolution uh to fuse and exchange information across different channels. Okay. So you can actually project them into um uh let let convolution work on each dimension individually rather than entangling them together. So using that idea people come up come up with mobile IV tool uh using the inverted uh bottleneck block. Why is inverted uh bottleneck?
+
+[00:17:56] So again in the beginning we have the one by one convolution um but rather than reducing the number of channel this is actually increasing the number of channel from n to 6n where we feed it to a 3x3 depolution. That is because the dep wise convolution has very limited capacity. Right? So each channel input channel and output channel they only directly map from
+
+[00:18:27] input to output channel but different channels does not talk to each other. So it has very limited capacity but it's very cheap. It's very cheap. Therefore you can afford to have more channels in this case. Uh so practical value here that in the design of mobile I2 they chose uh six as the expanding factor. So the one by one convolution expanded the number of channels from n to 6n and passes through the depth wise convolution and then have another one by
+
+[00:18:59] one convolution that reduce the number of channels from 6n to n in the end. So you can keep the input channel and output channel to be the same. They're both n. Therefore you can have this bypass layer that connect them. So let's compute the number of max assuming the n the number of channel of the input is 160. So for the first dwise convolution uh for the first pointwise convolution uh the MAC is input channel 160 output
+
+[00:19:30] channel 960 time HW * 1 by one for the dep wise convolution what is the MAC? So here we have 960 channels. Each channel is mapping one by one from input to output. So that's uh 960 * h * w * 9. Also for the output is 160 * 960 * hw * 1x1.
+
+[00:20:05] And let's also calculate the number of parameters. uh the input one by one convolution very easy input times output 160 960 and for the dep convolution it's mapping input to output one by one and each of them you have 3x3 kernel for each channel mapping and you have 960 of them so the total number of parameters for that layer is only 960 * 9
+
+[00:20:36] but this um design is very computation efficient but actually not very memory efficient. If you look at the uh figure uh the first figure on the left is comparing the parameters from res 18 to moment I v2 0.75 meaning shrinking each channel by uh 25%. They have the same accuracy but the number of parameter uh is reduced by 4.6 times using this inverted bottleneck mobile 9 v2 architecture. However, if you see the peak activation
+
+[00:21:07] that concerns the training memory is actually 80% larger. So the parameter efficiency doesn't translate to the activation efficiency. So that's during inference. Uh what about during training? So we are comparing ResNet 50 to mobile 9V to 1.4x. We scale them such that they have the same accuracy. Again the parameter reduced from 102 reduced by about four times but the activation uh didn't
+
+[00:21:40] decrease much only decreased by about 10%. So parameter efficiency doesn't uh translate to uh training efficiency or the actual memory efficiency because of the activation also matters a lot and why the mobile architecture is not memory efficient. Where is the bottleneck?
+
+[00:22:10] See the scaling factor n times six. That's a quite a big number, right? You're expanding the number of channels by six times. So making the activation a lot bigger in the middle. Although you are saving the computation by using the depth wise convolution, the memory footprint is actually pretty big for that layer. So that's actually the beauty of efficient air research where you try to solve one problem you generate another problem but you want to try to have a holistic solution uh to to solve the
+
+[00:22:41] problem at both uh dimensions. Okay. So let's go even deeper. Um can we further reduce the computation? Just now we solved the issue for 3x3 convolutions. What about for those one by one one by one um layers? Can we further use group convolution for those one by one layer? So one by one group convolution means
+
+[00:23:11] different groups. Now we have three groups rather than just one. We have three colors. That reduced computation by G, right? As we talked about previously, you have one by one group convolution. But uh the problem is different channels no longer talk to each other. That's the problem. We want the information to mingle. So people propose this idea clever idea of channel shuffling to allow the information between the red uh green and
+
+[00:23:42] and blue channels to talk to each other. So they move the pointers not moving the data. So it's easy to implement efficiently to implement. So that the uh green channel can now see both green and blue and also red channels. So that's the shuffle information uh uh building block. We put this uh channel shuffle building block after the uh group convolution one by one to further reduce the computation
+
+[00:24:14] and the remaining part is very similar to mobile IV2 where you have the 3x3 depth wise convolution. Finally you have another one by one group convolution. Okay. So these are all the building blocks for convolution. Let's now switch gear to talk about transformers. So transformer is very popular these days. Pretty much all the large language models are built on top of it or its
+
+[00:24:46] varants. Uh the basic building block is a multihide self attention. The attention layer. So what is the attention layer? So it has a query, a key and a value. you uh start with the projection layer. Um for QKV, you project the input to the Q matrix, the K matrix and the V matrix. And in practice, you can uh implement these three matrix uh com matrix computations
+
+[00:25:19] and merge them into a bigger one uh such that you have a larger parallelism. You can exploit the parallelism of GPUs. And then you concatenate um you can always uh concatenate the result and also you can split the result using a bigger convolution. So after that you can have uh the query times the um wi matrix for the
+
+[00:25:49] for the query part uh the key part and also the v part and the attention mechanism basically uh does qk transpose first the query times the key and then you scale them um and then sometimes optionally you can do the masking for example uh you only allow the future uh the current token to see the past token, not the future token to apply this causal attention. Then you have a mask that only have the bottom half of the matrix attention matrix. So that's the
+
+[00:26:22] mask and finally you apply the soft max to make sure each row sum up to one and also you have you then you obtain this attention matrix. Finally, you use the tension matrix to have a dot product with the value. So let's see what is the number of flops in this case. You start with the um query tensor. Okay, which is n by d. n is the number of tokens. So, and the number of rows in
+
+[00:26:55] the blue matrix equal to the number of tokens and the number of columns equal to the dimension the hidden dimension. So here is D hidden dimensions and you do the dot product with the K transpose. Okay, the transpose of K is D by N. D is the number of hidden dimension and N is the number of samples, the number of tokens. So what is the complexity of that n by d
+
+[00:27:25] * d by d by n matrix that's n um n squ d right that's n square d is actually uh quadratic to the number of tokens if you feed the language model with a very long context actually the computation grows quadratically with the length of your input and after that you can scale them by the square root of d um to standardize them
+
+[00:27:57] uh to prevent them from you have different dimensions then you want to scale them and then you do the soft max uh then you get a n byn um tension matrix and finally your dotproduct with the v matrix which is n by d what is the computation complexity we are multiplying the gray n byn attention matrix with the yellow N byD matrix that's again O N squar D. So both these
+
+[00:28:29] two computations are quadratic to the number of tokens. So that's why we are interested in long context research. How do we uh solve this problem from O square maybe to O to a constant? We'll cover that in later part of the lecture about during the long context session. We want to get rid of that O square. We like O. We like constant. We'll talk about um uh streaming LOM. We also cover linear
+
+[00:29:01] attention uh to cope with that issue. So let's leave a question mark for now and u we'll cover it later. So what does the attention matrix uh look like? We'll give you a visualization. I bet the video game is a lot more fun than the film. So in this sentence you can see this n byn matrix. The number of rows equal to the number of tokens. Number of columns also equal to the number of tokens. Um the matrix is pretty uh pretty easy to interpret.
+
+[00:29:34] For example, you see the dark point where video and game are heavily attending to each other. So that point the intersection between E video and game is very dark. But what are shallow point for example more um attend very heavily to then because more and then they come together a lot but more doesn't quite attend to anything else. So using this uh feature actually we can
+
+[00:30:05] eliminate a lot of redundant tokens. If a certain token doesn't attend to anything uh it's very easy to prune them. So here what is the difference between the pruning mech mechanism we talked about so far versus pruning the attention because attention doesn't have any parameters except for the projection layer the Q and K they are dynamic
+
+[00:30:36] they're activations Q transpose that's activation times another activation there's no weight to prune but what we can prune is actually the attention uh attention map. You don't need a full attention map. You can sply pick a subset of them. Maybe a structure pruning. We can apply that to the attention map. But that's also dynamic because there's no weight to prune uh in the attention layer here. So we'll cover that later part of this lecture too.
+
+[00:31:13] Okay. So for multi head attention you can concatenate the different heads result all together and times a bigger output matrix to fuse them into a single operation. When you have multiple QVs pass through the linear layer do a big uh scale dot product attention finally concatenate them together. All right. So, um let's take a five minute break and then we are going to
+
+[00:31:44] introduce the neuro architecture search. All right, everyone welcome back. Let's continue to discuss neuro architecture search. We have reviewed the design space and there is so many parameters we should choose from such as the number of layers, the kernel size, the number of channels, the connectivity, the resolution, right? um there's so many um knobs to tune and it's very hard for human to manually exhaust uh each configuration. So we want to have
+
+[00:32:15] automated approach to design algorithm to propose and design and validate and come up with new architectures. As we know if you want to have higher accuracy you need higher number of max. So as the max as the accuracy grow the MAC also grow. The size of the circle indicates how many parameters. The size of the parameter also grows. So to get a higher accuracy, you need to pay a large overhead. But doing neural architecture search, we
+
+[00:32:46] can push the frontier to the left hand side. So this is before, this is after, right? You compare the before and after. You have a lot of dots on the top left corner, which is the low computation and high accuracy uh space. So we will learn how do we achieve uh the top left corner. So the indust illustrate the component of of neural architecture search. We start with a search space like you want
+
+[00:33:18] to find your friend in a big forest. This is the search space. What are the configurations? What are the possibilities? And then we define a s uh search strategy. We propose an architecture. Right? We are going to evaluate whether it's a good or bad architecture. Uh just doing uh use your performance estimate uh performance metrics such as energy, latency, accuracy, model size, whatever you want to put over there. You get a give it a concrete reward. So you have a
+
+[00:33:50] performance estimation and then you continue um to to propo uh continue your search strategy to propose another model architecture evaluate the performance uh get a feedback and then do it on and on again. So let's start talking about the search space including both the cell level search space and also the network level search space. Imagine you are building a like a 100 floor um
+
+[00:34:21] skyscraper. Um you want to design the first floor first and then you can probably u replicate the first floor's design to the second floor to the third floor and stack multiple floors repeating the design for multiple floors. So this is also applying to neural architecture research. You have so many layers roughly there are two category one is um the normal cell the other is the reduction cell. The reduction cell is reducing the number of channels and
+
+[00:34:51] expand um and the resolution reducing the number of resolution maybe increasing the number of channels but the normal cell is keeping the same resolution and you can repeat the normal cell several times in this case repeated by n times until you go through the next next reduction cell. If you want to reduce the uh resolution um by 32 times, you probably need five reduction cells. And between reduction cells, we are
+
+[00:35:21] repeating several normal cells. This is example of uh what is a what is a normal cell versus a reduction cell. This was published in the first NAS paper in 2018. So it has many be uh many operations you can choose from either hi or h i minus one. You can do uh 3x3 convolution 5x5 or identity mapping in the yellow part. You can add them together or um you can
+
+[00:35:51] choose how to combine them them together like concat or add etc. And here uh this paper use an RNN controller to generate the candidate cell. Uh what you need to do here is you first select two two input. Okay, that's the gray part. Select input one and select input two. After the input, you want to select the
+
+[00:36:21] operation to apply to the first hidden state to the first input. And also you want to select the second operation to apply to the second input. And finally you want to combine them like the green part. For example, use the add operation, use the concatenate operation uh to select from different combination methods uh to combine these two cells.
+
+[00:36:54] This actually can be a pretty big design space. Cons consider we have two candidate input hi or hi minus one and you have m candidate operations to transform each hidden state and you can have n potential operations to combine them. What is the size of the search space? How many choices can we explore? If we have B layers, we are building a skyscraper with B layers.
+
+[00:37:37] we can uh calculate it step by step. So first of all uh we have two layers uh two choices for each input right input one we have two choices input two we have two choices so all together we have four choices and for each input we have m potential candidate operations to transform it so m * m all together we have m squ and then we want to merge them right such as using the green add operation not only the add but we have n such potential operations to mingle them together. So times n here.
+
+[00:38:11] So that's for one building block for one floor and we are building several floors b layers. So to the power of b. So it's 4 to the^ of b * m to the power of 2 b * n to the power of b. Assume like I'm equal to five. You can have five uh candidate operations like one by one convolution 3x3 5x5 deping. Okay, you can easily have five operations for M. And if n equal to two
+
+[00:38:42] n potential operations to add them together you can element wise add uh you can concatenate you can you can at least have two operations to mingle them and also we have b equal to five five layers we can easily have 10 to the power of 11 candidates in the search space that's huge and then we have the network level uh search space just like building a skyscraper You can decide how many floors you want to build. That's the
+
+[00:39:14] depth dimension. So here for each building block we can have like depth of one or two or three or here we can have um uh two, three, four, five. You decide how many times you want to repeat. Of course the deeper you go usually you have more higher model capacity but also it's slower. It's more parameters and more less efficient.
+
+[00:39:45] You also have the resolution dimension. Um, how wide you want to build your network. You can have 128 resolution, 160 resolution or 224x 224 resolution. You decide what's the resolution you want to achieve. The lower the resolution, maybe you have less compute, less memory, but also um less model capacity. So that's always a trade-off.
+
+[00:40:16] You can also have the um the W dimension like the channel number um 64 96 3 256. So that's the channel width dimension. So these two are different. One is the resolution dimension. That's the X H and W. And this is the width dimension the channel dimension CI and CO. They are different. You can also have the kernel size dimension uh using 7 by seven layer or 5x5 convolution or 3x3 convolution. So
+
+[00:40:47] that's the kernel size dimension and you you can also have the topology uh dimension. So here is the network level search space. Each path along the blue nodes uh will corresponding to a uh network architecture. For example, you can uh here you do down sample on the top right corner. Down sample and then flat. Down sample and then flat. Right? You can also do down sample down sample down sample flat. Up sample up sample up
+
+[00:41:19] sample. Right? You can also do down sample down sample down sample. Up sample up sample down sample down sample up sample up sample. Just like you are doing the going to the gym and you can have pro different programmable um training curriculum, right? So each path from the input and output corresponding to a different down sample and up up sample scheme. So given such a large design space what do we want is actually a large enough
+
+[00:41:52] design space that cover the design that we are interested in. So we don't want a huge design space which is do too difficult to search but we want to make sure it cover the potential model that we are interested in. So we need to design the design space. So searching a good architecture is like searching um your friend in a big forest right if the forest is too big we want to narrow it down. So starting with a
+
+[00:42:22] big network design space uh we want to do a first search space optimization like prune away half of the design space which is not promising. We just get rid of it. We don't design over there focus on the interesting part and finally we do the search in the area in the space that we are interested in rather than in the full design space. The tiny NAS algorithm is basically automated uh search space optimization
+
+[00:42:55] plus resource constraint model specialization. Uh we'll do a case study for uh designing the search space for tiny ML. Um we did it about uh five years ago where at that time there are many models designed for uh for the cloud and also for mobile phones but very few model is designed for tiny microcontrollers with just a few megabyte of memory or a few kilobyte of SRAM.
+
+[00:43:26] So we have to design everything from scratch give us opportunity to design the design space for the phone. Actually you are constrained by latency and energy due to the um battery right but usually a phone has easily can have like 4 GB of memory or 8 gigabyte of memory but for microcontrollers or these uh tiny devices you are very constrained by the memory. If the model weight or the activation does not fit the memory is
+
+[00:43:58] actually super expensive to fetch them um from lower level memory. So this is a comparison how different the design space is. So comparing both the memory and also the storage in these two rows uh cloud AI have tens of gigabyte of memory and terabytes of storage. On a mobile phone you can have like uh 4 gigabyte or 8 gigabyte of memory and several tens of uh t maybe
+
+[00:44:30] tens of gigabyte of storage. But for tiny AI on a microcontroller, you have uh 320 kilobyte of memory and only one megabyte of storage. So that's three orders of magnitude difference between the mobile AI and a tiny AI. Well, if you see the uh models on the market at at that time, it's roughly uh a few megabyte compared with a few hundred kilobyte. So how do how do we
+
+[00:45:01] bridge this gap? Several order of magnitude gap. So we want to design redesign the search space for tiny ML. Right? So what is the principle here? We want to maximize the amount of compute given the same memory footprint. Remember during the beginning of the class uh we mentioned computation is cheap, memory is expensive. When you are fetching a fixed amount of memory, you want to do as much operation
+
+[00:45:33] on top of this precious memory you fetched, precious data you fetched from memory as possible, right? So larger flops means you have a lot more model capacity and more likely to give a high accuracy. So that's why a good design space um should have high flops under the same memory constraint. Because we cannot train the model and accur and measure the accuracy for each of them. Not to mention for large
+
+[00:46:05] language models can probably just train only once. So therefore we use higher flops under the same memory constraint to model what to predict whether it's uh promising to have this design space versus another. In this figure there are many different design spaces uh from the red one to all the way to the left to the black one. The x- axis is the flops in millions. The y-axis is the cumulative uh
+
+[00:46:37] probability for different design space. uh for example the red design space um when you have 80% of the model that has 50.3 uh median flops versus for the black design space you have 80% of the models have only 33 median um flops. So this red one is better or the black one is better.
+
+[00:47:08] The red one um has more models that has higher um higher flops and indeed this generated better model. The best accuracy on the right design spa design space has 78 uh% accuracy while on the black design space it has only 74. So using this huristic it's a good measurement how to find whether this design space is more likely to generate
+
+[00:47:40] good model just how likely it's going to is it going to produce high flop model given the same memory constraint okay so um what are the advantages and disadvantage of these two models one is resnet ragnet I'met for search space design. Actually, if you just use the original ResNet um
+
+[00:48:10] resident 18 uh search space, uh you can get about 80% 80.3% accuracy, but unfortunately it ran out of memory. Using a random search space, you get 74.7. Using a very big search space, you get 77. But using our smartly designed search space you can get 78.7. So designing the design space is actually uh quite crucial.
+
+[00:48:42] And on the right hand side is validating our assumption that um the search space with a higher uh mean flops will more likely to lead to high accuracy. So you can see the flops and the accuracy are very positively correlated and they are under the constraint that all these flops these models can fit the same amount of memory otherwise you can have arbitrary high flops uh which
+
+[00:49:13] doesn't make sense. So under the same memory constraint that's a very important assumption. Okay. So we have designed a good search space. Now we need to search within this search space. So we will talk about the search strategies. We want to search uh from a set of candidate neuronet network architectures. And the search strategy
+
+[00:49:43] right here defines how do we find the best one. We'll introduce greater search, random search and gradient reinforcement learning, uh gradient descent and evolutionary search. So let's start with grid search. Um it's a very traditional way and a very uh easy way to do hyperparameter optimization. Um you can uh have the design space represented as a cartisian uh product of
+
+[00:50:16] a single dimension search spaces. For example, for resolution you have 1x 1.1x 1.2x that's for resolution and the width you can have 1x 1 1x 1.2x 2x. Okay. So you have a cartigian product of these two dimensions. You can have a 2D map right here. Um you can search one by one, right? Resolution one with one two three. Resolution two with one two three
+
+[00:50:47] etc. Basically it's brute force searching um each configuration independently. But this is very expensive. This is just two dimensions. you have three if you have three dimensions you can easily have a cube and then you have four dimensions they quickly explode if you have a lot of GPUs that's good maybe you can exhaust the design space but if you don't have a lot of compute resource uh you will spend a lot of time wasted on computing on uh less promising ideas
+
+[00:51:21] but usually this is a good proof of concept to begin with this is example of grid search um on efficient net. So it apply compound scaling on the depths the width the resolution on the starting network. So basically it performed the greatest search on the alpha beta gamma um for the depth width and resolution such uh that the total flop of the new
+
+[00:51:51] model is 2x of the original model. Okay, you can search the number of channels, wider or narrower, the depths, deeper or shallower. Okay, and also the resolution, higher resolution or lower resolution. Also, random search feel like uh does this make sense? Actually, usually random search is your friend when you are trying to debug uh the search algorithm.
+
+[00:52:26] Great search will very regularly um search from different dimensions but random search you just randomly sample different configurations and after a few iterations if you see improvement it doesn't mean you are correct but if you didn't see any improvement it's very likely that the algorithm is wrong. So usually people use random search uh to debug uh the code before they start the search formally.
+
+[00:52:56] People can also use reinforcement learning uh to do uh search search space design uh search to do the as the search algorithm. Okay, since this is sequential uh decision making problem, you have to decide okay what's the first node? What's the second node? What's your operation on the first node? was an operation on the second node and how do we combine these two node right it's a sequential decision making problem so the RN controller will propose a sample architecture with probability P
+
+[00:53:26] and then um train a net child network with this architecture A to get a reward accuracy reward R and then you can compute the gradient of P and scale it by R to to the controller so it's part of the RL algorithm and you can update the new uh the new sample. So using this you can continuously provide the number of filters to make a decision for the kernel height, kernel width, the stride etc. number of filters
+
+[00:53:59] and filter height etc. Actually people can also use gradient descent to uh represent the output as at each node as a weighted sum of the output from uh different edges. So here is a topology and any on the question mark that is the probability uh you can choose this path you don't have to choose this path but you have a prob probability of choosing each path.
+
+[00:54:29] Uh for example um for the second node you can also you can choose either from node one or node zero. If the probability is p1 and p2 um you can make the activation of one node one time p1 plus the activation of a z time p 0. So you can get a weighted sum of the previous activations dotproduct with the probability of this path.
+
+[00:55:01] So you can make this architecture design differentiable in this way. So it's a it's a sum the output is a summation of the input uh while weighted by the probability of each path. And it's also uh possible to take the latency into account not just the accuracy. Uh for example you have uh several different choices four different choice for this layer. Uh you can either
+
+[00:55:33] use 3x3 cal or 5x5 cal or identity or ping and the probability of choosing each path is alpha beta gamma etc. So what is the expected latency? You can pre-measure the latency of 3 by by3 comp that's f comp 3x3. You can also measure pre-measure the latency five of the 5x5 convolution layer and also the identity
+
+[00:56:04] layer and the expected latency would be the weighted average of different configurations. uh the weight is basically the probability of choosing each path. So the loss is not only the cross cross entropy loss plus the regular regularization term but also the expected latency. So now you can make latency differentiable because we can uh smartly choose the
+
+[00:56:36] probability of choosing each path. For example, a 5x5 layer if that's very expensive, very slow, probably we are going to choose a very low beta on top of it. Otherwise, if the beta is high um then it's multiplying with f com by com 5 by five that will be a large number and will lead to a big loss in that case. So we want to minimize the loss at that time. We can also reduce the latency in
+
+[00:57:06] this case making latency differentiable. We can also use evolutionary search right to mimic the evolution process in biology. You can do crossover, you can do the mutation. So this is the full uh pipeline. You start with a uh initial uh population and you have a a term uh to calculate the fitness function. Then you can do crossover or mutation and keep keep the
+
+[00:57:40] ones that survived this mutation crossover and do this again. So what is that like for new architecture search? So the idea is you want to have high accuracy and also high efficiency. So that is the fitness function. How to define if a model is good or not? It has to be both fast and also high accuracy. You started with this um depths of three in both stage one and stage two as a
+
+[00:58:12] starting point and then you can do mutation on the depths. For example, stage one rather than depths of three now you can have depth of two. You can also mutate the second part uh from deps three to deps two. So that's mutation. Uh you can also do um mutation on the operator. Um for example rather than uh using 3x3 convolution on the left, you can now use 5x5 convolution or using 7 by7 convolution.
+
+[00:58:44] And then you do the crossover. So this is the previous generation. This is the later generation. you do the crossover. Uh for example, for the first node, you choose from parent one, which is uh a bit of a 3x3. For the second layer, you can also choose from parent two to use 5x5 all the way to the last one. Um the seven by seven layer actually chosen from parent two. You want to choose the
+
+[00:59:15] best from the parent one and parent two to get the next generation. So that's the idea of evolutionary search. Okay. So in today's lecture we covered the basics of neuro architecture search. Uh we want a high accuracy, low latency, low energy, low memory. But that's hard to achieve. So how do we design the model to achieve them all? So we started with how to build um how to um have the primitive operations, what are the building blocks with the search space,
+
+[00:59:46] how do we design the search space and then the Naz search strategy. I have a question. Now I think both for example we provided a heruristic given the same amount of
+
+[01:00:17] memory footprint you want to maximize the amount of compute in that search space if the compute flops in that search space if it's very low you will remove it otherwise you keep it you can apply more heristics like this to prune your search space or design a search space. All right. So in the next lecture we'll cover a few hardware aware NAS techniques.

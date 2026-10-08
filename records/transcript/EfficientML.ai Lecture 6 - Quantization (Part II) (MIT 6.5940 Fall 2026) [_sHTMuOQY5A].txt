@@ -1,0 +1,236 @@
+EfficientML.ai Lecture 6 - Quantization (Part II) (MIT 6.5940 Fall 2026) [_sHTMuOQY5A]
+Source: https://www.youtube.com/watch?v=_sHTMuOQY5A
+Language: English
+Transcript source: YouTube automatic captions; unedited.
+
+[00:00:05] Okay. All right. Let's get started with efficient ML lecture six. We are going to talk about the second part of quantization. So today we'll first review what we learned last time. It's been a week. So we will review the linear quantization the algorithms and then we'll introduce the very important technique for recovering the accuracy after quantization which is PTQ post training uh quantization. This is without having to retrain the model. Okay, first quantize the model and then without any
+
+[00:00:36] retraining you try to recover the accuracy. How to colleate it? How to do channel quantization? How to do group quantization? uh what is the magic before behind Nvidia blackwells the NV FP4 Nvidia's FP4 format uh why is it so powerful and how do we uh recover the accuracy and next we are going to introduce quantization aware training techniques how to uh simulate the inference time quantization during the training and during the finetuning
+
+[00:01:07] process to recover the accuracy later we'll talk about binary and turnary quantization and automatic mix precision quantization. Okay. So last lecture we talk about these three parts the starting from a floatingoint weights floatingoint arithmetic uh we quantize the weight by k means uh using integer storing the index into the code book. So it's integer weights but floatingoint code book. The arithmetic
+
+[00:01:39] is still floating point arithmetic. Um for the last part of the lecture uh last Thursday we talked about linear quantization using linear weights and also uh fully integer arithmetic. So a review of K means based weight quantization. Remember we have a index which is two bits because we have four entries in the code book. Four entries corresponding to four colors. Uh
+
+[00:02:10] the first look means clustering cluster similar weights to the same cluster and then storing the index to the cluster for example 2.09 09 that's closest to the third centroid which is two which is two then we are storing the cluster index three because that's the third attriation and pruning can we apply them together and which one should we apply first should we apply quantization first or
+
+[00:02:41] should we apply uh pruning first this figure answers that question so pruning only can give the yellow curve you can compress the model to about 8% before the accuracy starts to drop very quickly. Uh pruding and quantization only roughly 8%. But if you do pruning and then quantization you can push this curve all the way to about 4% 3 to 4% before the accuracy drops very quickly. So you can
+
+[00:03:12] go further to the left means the model size can be smaller if you combine protein and quantization. Uh last lecture we also learned about linear quantization which is the mapping from integers to real numbers. So the r equal to scaling factor times the quantized value minus the zero point. Okay. So here minus one is 0.1.07
+
+[00:03:43] is a scaling factor and this is the mapping from integer to floating point. uh Z is a zero point which will be mapped uh to zero for different uh precision um two bit, three bit, four bit and n bit the Q min and Q max the smallest and the largest integer can be represented given that amount that number amount of bits.
+
+[00:04:20] Uh remember we went through a long uh equation finally get the uh representation for the quantized version of a fully connected layer w = to y = wx plus b. The assumption is the zero point for the weight is zero because it's a symmetric distribution around the zeros and similar for the bias zero point is zero. So zero will be mapped to zero and we define SB to be SW * SX Q by S = to
+
+[00:04:50] QB minus ZX QW. We can get this equation. So the first term sx sw divided by sy can be rescaled um to n bit integer and these two terms in blue and in blue and yellow uh can be mapped with integer add integer multiplication and integer add and similar for convolution we can do all the arithmetic in mbit integer
+
+[00:05:26] okay so here's the new have post training quantization. How should we get the optimal uh scaling factor and the optimal uh zero point? We'll talk about quantization granularity. Similar to the pruning granularity, you can uh prune a whole bunch of entries. You can also quantize a whole bunch of entries or a few entries. Which one is easier? Is it easy to quantize the whole tensor or a subtensor?
+
+[00:05:59] answer from the computation perspective that's easier because it's easier to implement. What about from the quantization error perspective? The subtensor, right? So again, there's a trade-off very similar to pruding is a trade-off between the accuracy versus the um um implementation easiness. We [snorts] also talk about dynamic range clipping and rounding. Let's [clears throat] start with the quantization granularity. Okay. So few choices. You can quantize
+
+[00:06:32] the whole tensor. For the whole tensor, you have a single scaling factor. You have a single zero point. You can also do per channel quantization. For this channel, you have a scaling factor and different channels you can have different scaling factors. Of course, if you have different scaling factors for different channel, it will be easier to quantize because different channels may have different dynamic range. You can go even finer granularity to do
+
+[00:07:02] group quantization. Actually, that's why they use the Nvidia's blackwell GPU architecture. So, this per vector quantization, a small vector, not the not even the whole channel. And there is a popular MX um shared micro exponent data type we introduce. So starting with the pre tensor quantization uh so we can get the R max equal to the uh w max which is the largest value
+
+[00:07:34] among the whole weight tensor for that layer. So the problem of using a single scaling factor for the whole tensor is that um different output channel may have very different dynamic range. For example, here all together you have 32 channels and for each channel we draw the distribution here. The distribution varies a lot. The mean and the max. Some of them may have a very large dynamic range. Some of them may have very small
+
+[00:08:04] dynamic range. Um for some models like this the accuracy will drop because you are using a single scaling factor a single max to represent the whole layer. It's like using um the same ruler to measure a giraffe and measure an ant. Right? It would be very challenging to use the same ruler to measure the giraffe ant. For example, in this case, channel 15, that's a giraffe and channel one is an ant pretty short.
+
+[00:08:42] So the failure just results from the large difference in the um ranges of the weight of different channels. It can be as large as 100 times larger for large language models. So the solution is per channel quantization. You can group um the giraffes together, you can group the ants together and hopefully um per channel contrained contisation scheme for them. So that's the per channel quantization you have finer granularity and let's
+
+[00:09:14] compare them for this tensor. This is a 4x4 tensor we are very familiar with. Now we are going to do both per channel quantization and also the per tensor quantization according to our equation. Let's first find the R max. Okay, the max value of the whole tensor. What is that? 2.12 [clears throat] value. Then we can calculate the scaling factor
+
+[00:09:45] R max divided by Q max. So now we are doing two bit quantization. Uh so the q max equal to 2 ^ of 2 bit minus one minus one okay so that's one so the s equal to 2.12 in this case and then we can quantize the tensor that's the quantized diversion multiplied by s. So that's the uh reconstructed tensor
+
+[00:10:16] and we can calculate the difference the quantiz quantization error which is the w minus the uh quantized and recovered reconstructed um reconstructed weight is actually 2.28. What about per channel quantization? So according to per channel definition, you have one scaling factor for each channel and R max is also calculated per channel. And so here we have four channels.
+
+[00:10:49] Therefore we can calculate four R maxes and S equal to R max divided by QAX. So we can have four different scaling factors. So here is the uh quantized version and here is the reconstructed version and what's the difference between these two quantization schemes with respect to the reconstructed value. Which entry is different?
+
+[00:11:20] Actually lots of entries are different like the first one um you have 2.09 the second row you have 2.12. However, in the per tensor quantization, the value are all the same 2.12 because it's very coarse grain. And also one of the entries flipped um the value is minus one. Previously it was zero in the other case. And if we calculate the quantization
+
+[00:11:52] error, which one is smaller? The per channel quantization give you smaller quantization error because it's more flexible. We can have a separate scaling factors for different channels. Okay. Can we do uh even more aggressive to do group quantization? We are going to use uh introduce per vector quantization and also shared micro exponent the MX data type.
+
+[00:12:25] Why do we need group quantization? Um we want to achieve a balance between accuracy and hardware efficiency. So does hardware prefer smaller group size or larger group size? Finer granularity or coarse granularity. maybe finer they call in the the >> um actually it's coer because it's easy to paralyze you can execute one
+
+[00:12:55] instruction and multiple lanes can work at the same time um so actually hardware prefer coarse granularity what about accuracy does accuracy prefer course or fine granularity >> fine >> fine yes you can just like that example before we can have lower quantization error if you get more detailed scaling factor. So we need a sweet to find that sweet spot to understand what's the best
+
+[00:13:25] granularity and blackwell GPU give that answer uh support this micro tensor scaling to optimize the accuracy of FP4. Um actually you can see um the FP4 tensor core has 18 pa flops um which is a lot a lot higher uh compared with the um FP16 tensor core which is 4.5 plops versus int 8 that's 2x which is nine FP8 that's also nine while the IP4
+
+[00:13:57] is 18 pa flops. So like we mentioned we want to find the optimal granularity neither too big which will be hard to accelerate nor uh which is not too big which will be hard to recover the accuracy and it also shouldn't be too small otherwise it's hard to accelerate in hardware. So VS quant is a paper that incl uh introduced how to find how to define this per vector scaled quantization.
+
+[00:14:35] So here we define the r to be the scaling factor times q minus z. But here we have two value two steps two hierarchy of scaling factor. Okay we first have r this gamma which is a floating point coin scaling factor. So um the scaling factor gamma applies to each tensor. So this is per tensor scaling factor and for each vector on the top right corner you have a finer granularity of per vector scale factor
+
+[00:15:06] which is sq. So that's why here we have two sub components right here the scaling factor has two part one is gamma which is a um per tensor all the tensor share the entire tensor share that gamma and there's another component which is per vector sq. So that's a good idea because you both have this very flexible floating point
+
+[00:15:38] 32-bit um scaling factor um giving you very fine grain control of the scaling. You also have uh this very cheap um integer uh scaling factor uh that's very narrow. um is also giving um fine grain control on each vector but it's very cheap compared with floating point 32-bit or 16 bit scaling factor this one has it's integer and it's much cheaper.
+
+[00:16:14] So given the four bit quantization and four bit per vector scaling factor for every 16 element let's calculate what is the effective number of bits. So the group size is 16. Every 16 entries share one fourbit scaling factor. So for the 16 values you have how many bits four bit for each one and now four bit scaling factor shared across 16 values since the group size is 16 then the effective bit is four + 4
+
+[00:16:48] divided by 16 that's 4.25 bits. This is ignoring the global scaling factor 14 point scaling factor 32 bit 16 bit for the entire tensor. Okay. So um this is about the multi-level scaling. You can have a global scaling factor. You can also have a local scaling factor level zero level one and that's the beauty of it. Let's
+
+[00:17:19] summarize a few quantization configurations starting with this per channel quantization. So what is the data type? It's into four. What is the L zero group group size since it has only one level which is um L0 the group level. So that's per channel quantization and the scaling factors data type is FP16. So that's the simplest case just one level L0 L1 is per channel
+
+[00:17:52] and VQ introduced this two level of optimization. Okay. So the first level the data type itself is in four and the um our zero the group size is 16 for 16 and every 16 elements uh you share one scaling factor which is very cheap which is in four okay and sign into four scaling factor for every 16 elements and also you have a global scaling scaling factor for the whole channel the
+
+[00:18:22] yellow [clears throat] okay for the whole channel you have a FP16 16 scaling factor. So we can calculate the effective bit width is four bit that's per entry it's four bit also have a four bit scaling factor shared across 16 values. So the effective bit width is 4.25. Uh there's also the MX data type MX6 MX4 MX9. Uh they are very interesting. Um
+
+[00:18:53] actually the L0 group size is actually two for every two element >> [snorts] >> uh they share the same exponent. Okay. So L0 scale data type is E1 M0. So just one bit for exponent and then shared across two entries. [cough] The data type for MX4 four bit [clears throat] uh you have one bit of scaling factor two bit of mantisa for each individual and you have one bit
+
+[00:19:24] of exponent shared across every two elements and finally you also have a global scaling factor controlling every uh 16 entries and that's E8 M0 you can only have the exponent bits but no mis so for MX4 Or what is the effective bit width? We have three bits from right here. One sign bit to my bit. So three um plus one divided by two because we have one
+
+[00:19:57] exponent bit for the L L0 um scale data type divided by every two elements. So that's the 1/2 plus the eight bits of L1 scaling factor divided by 16 entries. So three plus a half plus a half that's four entry uh four bits per entry. Similarly we can calculate that for MX6 um that's available in AM GPUs and also media GPUs. data type you have one sign
+
+[00:20:28] bit and four misa bit you have one exponent bit shared across every two entries and also you have a 16 um eight eight bit of uh exponent only scaling factor shared across 16 entries so the um total number of bits is five okay because here you have one and I'm four is five plus a half this is half [laughter] and 8 / 16 all together you have eight bits uh six bits. That's why it's called MX6.
+
+[00:21:02] Everyone following this? Any questions? So far, this is honestly probably a dumb question, but why are we dividing here the bit with like what exactly is that signifying? What is the the top and the bottom part of the division operation there? >> What is the top and bottom division? So we are calculating for each um each weight how many bits are we using to represent each weight and now we have both the weight itself and also the scaling factor. So we also want to
+
+[00:21:35] consider the how many number of bits are we consumed to store those scaling factors. For example [clears throat] this is the weight itself or the activation the data itself and blue and yellow are all scaling factors. So this is a scaling factor. For every two entries you have one bit, one exponent bit of scaling factor. So that's one divided by two. You have one bit shared across two. So each one you get zero and a half. And now you have every 16
+
+[00:22:08] entries as a group will share a eight bit scaling factor. So how many bits per entry? So 8 divided by six half bit. am I the scaling factor across 16 entries each entry get half >> so that's why we get eight plus a half plus a half oh sorry five plus a half plus half all together that's six >> thank you for there >> okay [laughter] okay good question
+
+[00:22:39] I have one more so so for the L0 scale data type we just have one exponent bit only one bit per exponent right so is that like it's not it's kind of like useless. It's kind of useless, right? >> Um it's kind of yeah, you have one exponent bit you can shift it or not and um that's controlling uh only two two groups. Personally, I like the area before uh better. So, but this is also an important data type.
+
+[00:23:10] >> So, if I understand it correctly, there are some weights which have more precision than others. In this example, >> there are some ways that has more some more precisions than others. >> Yeah, like we have L0 and L1. Uh and for for the smaller group size uh is it like the since we have only we have two scaling factors like first L0 and L1 but the the L0 does not span the
+
+[00:23:44] entirety of L1. Right? L0 is the low-level scaling factor controlling every two entries. That's why L0 only cover two entries W01 and W11. Right? And L1 scaling factor that's the horse granularity scaling factor controlling every 16 entries. And here we cannot draw it but here controlling four entries. But you can imagine we're controlling 16 entries. on the right yellow part is controlled by the L1
+
+[00:24:14] scaling factor. >> Yes, >> that's how we visualize that. >> Thank you very much. One last question like how are we using this one exponent here like this L0 scale data type like what is it doing? Uh, it's actually doing it's actually doing stuff. For example, W11 W21 sorry W21 W31 maybe W 01 and W11 the scaling factor is one maybe W21 W31 the scaling factor can be zero. So they can have that uh flexibility for every two
+
+[00:24:45] entries. >> One more question. So then the the weights become just 0 minus one and one and then the scaling factor multiplies into into something resembling the weight. [clears throat] >> Yes, because it's exponent exponent only you are shift shifting it or not. >> Yes, thank you. >> Expanded dynamic range. So all these are very new. These are probably three or four years. uh while computer has been
+
+[00:25:16] bite online since 1950s. This is very new and this is actually a golden age due to AI. These new data formats are invented because AI is very um robust to quantization and these narrow bits and two bits uh two entries just one bit people play with this um thing very recently. So it's um I think exciting moment for computer science.
+
+[00:25:46] Okay, let's move from quantization granularity to dynamic range selection. How to uh clip the value to select the best dynamic range. So um the dynamic range for weight is very easy to to decide because the weight is whatever it is is offline. You can decide it offline. But for activation, different inputs, different images, different words, the different tokens, the activation rings might differ.
+
+[00:26:17] Some of them might be large, some of them might be pretty small. Um so to determine the floating point range, um we have to gather the statistics before deploying the model. So one way to gather the statistic statistics is during training we can um maintain the exponent average for the dynamic range like the RV and R max can be alpha from the time t plus the
+
+[00:26:51] discounted version of that um of t minus one. So you can have a EMA of the all the history [laughter] and R5 is a discounting factor. You can also have a collaboration batch. Okay. So you have a bunch of images assuming this image or input or token or whatever input is following the same distribution and you can use that to represent the distribution of the whole uh data set. define the mean, define the
+
+[00:27:23] max. And how do we define the um mean and the max? Um actually we can optimize for it. Okay, the optimization goal is so we have X, we have the quantiz X, we want to minimize uh the difference between the quantized version and the original version. So if the distribution is either gausian or llashian distribution um they you can actually um get a
+
+[00:27:56] optimal clipping value. For example, if it is llian distribution 0B the R max how to choose the R max will be for two bits is 2.83B for three bits is 3.89B for four bit is 5.03B 03b if that has a closed form solution if the distribution of the activation strictly follows the llashian distribution. But how do you get this hyperparameter p
+
+[00:28:28] from the the llian distribution? It can be estimated from the input distribution. Um but what about in the general case if it is doesn't it doesn't follow the lashian distribution or normal distribution actually you can use the kale divergence to minimize uh the difference between these two distributions one is before quantization you have a distribution one is after the quantization you have another
+
+[00:28:58] distribution and k divergence of two distribution p and q is defined as like p time log p / And this is very useful, very easy to implement um because most of the so for example you have a clipping at a value uh 10,000 everything below 10,000 um you get the um original value everything above 10,000 will be clipped to 10,000.
+
+[00:29:32] So this is exactly what I was mentioning but the clipping uh here is set at about 40 right. So this is the original distribution. Uh this is after the um clipping to minimize the information lots of information by minimizing the cha divergence. Imagine you can move this vertical line if it's too far to the right hand side. Um you can have a very large distance between different centroids but very few value will be clipped. For example, that that value
+
+[00:30:04] everything above for uh 40 is clipped to uh to 40, right? But if you have the vertical line too close to zero, uh lots of them will be clipped. So you have a larger error neither too too far or too close to zero is good. So there's optimal in the middle. And how to find that optimal optimal point? You have to calculate the KL divergence. when you are minimizing the chaot divergence that's the optimal
+
+[00:30:34] place. So here is the visualization for uh different models net 52 uh this is the optimal clipping point um where is where that is located. So rule of thumb is you want to minimize the loss of information by minimizing the cha divergence either too big or too small.
+
+[00:31:07] Um let's introduce another way to um calculate the dynamic range for quantization. Um intuitively um if you don't clip it you have a distribution and you just evenly um quantize the entire between mean and max. What's the problem of of that? The distance between the adjacent quantization bucket is very far from each other. So everything in between that bucket um will have a large pretty
+
+[00:31:38] large quantization noise uh because it's too coarse grid distance is too too large and why that is not necessary because some of them have very low density everything pretty much everything is centered in the middle. Okay. Um that's the usually the weight distribution is like that activation is very similar. uh but you wasted a lot of buckets. You have very little very very few entries in this range but you are wasting lot of contisation buckets over
+
+[00:32:08] there. So one solution is to clip it. So everything in the blue part is clipped away. Uh clip means if it is below that value you set it to that value. If it's larger than the other value you set it to that larger value. And in that case the quantization noise becomes much smaller because the quantization bucket becomes much closer. The vertical red line becomes much closer to each other.
+
+[00:32:43] So you can imagine neither too big nor too small is good. Why is that the case? So if the clipping is like this case is not good because you are wasting the quantization buckets to those low density area and if you go too close that's not good either because lots of them will be clipped right so uh it's actually a convex problem something in the middle is optimal point and this
+
+[00:33:14] paper um actually introduced a solution called octave to um find where is the optimal uh clipping point and after the octave we can recover the accuracy very well and that's a visualization of what do we need to clip and how to find that optimal clipping point.
+
+[00:33:50] Okay, let's jump to the next topic which is rounding. So, uh you have an array like 0.3, 0.5, 0.7, 0.2, you need to round it to the integer. Uh one in solution is to round to the nearest like 0.3 you round it to zero. 0.5 you round it to one. But actually that is not always the best solution and adding randomness usually helps in deep learning models. So this add round approach can round this 0.5 to
+
+[00:34:24] zero. Okay, usually 0.5 if you round it it becomes one because it's closer to one. But you can also give some probability of rounding that to zero. So adding such perturbation or randomness really helps. But again what is optimal? Um we can actually find a rounding that can reconstruct the activation best to minimize the difference. So here rather than just running to nearest we give it a probability give it
+
+[00:34:55] a chance to run to um to the floor or to the city. We can took a learning based approach. Okay, rather than the W, we do the floor of the W and plus a delta. Delta ranges from 0 to one and then round it. So here h is the function that map to the range of zero and one. Okay, so round with W, we find the floor of W and and plus HV.
+
+[00:35:26] So B is a random variable of the same shape of the input X. So this becomes optimization problem. We try to minimize the difference between the original W and also the quantized W and the quantization rather than directly run to the nearest. We can add it value between zero and one and try to optimize um this function to minimize the loss.
+
+[00:36:03] Okay. So here we summarize we have discussed so far on the right hand side uh zero point we have asymmetric and symmetric quantization depending on if 0 point is zero then it's a symmetric quantization. We talk about the scaling granular granularity. We can do per tensor co quantization. We can also do per channel quantization. We can also do group quantization. And then we talk about the range clipping. Um the range the weight the activation is really very concentrated
+
+[00:36:33] in the middle. So you want to clip away those far values. Um and there's algorithm to minimize the ko divergence or minimize the mean square error to decide what is the best clipping range. Finally we talk about rounding. You don't have to always round to nearest. we can stocastically round it to uh certain values and we talk about how to formulize that into a optimization problem.
+
+[00:37:08] So here are some um results for post training using linear quantization quantize everything to integer 8 bit integer for this larger uh for this Google net reset um either symmetric or asymmetric quantization give very good very low quantization error but some small value um does not perform as well okay due to their small represent representational capacity and we'll take a break before we dive
+
+[00:37:38] deeper into how should we improve the accuracy for those tiny small models. Okay, let's take a five minute break. >> All right, welcome back everyone. Then let's continue to discuss how to uh improve the performance um when the accuracy job is too big and the solution is quantization aware training. We are going to recover the accuracy by QA quantization where training
+
+[00:38:09] um so um we want to review u the C means quantized approach. How do we u train it to recover the accuracy? So in that case we have the gradient we color them using the same color pattern as the weight meaning that they have the same group and save after k means and then we group the similar um similar values together like the blue part is near zero um um and we accumulate all the gradients
+
+[00:38:40] together u by reducing them and multiplied by the learning rate subtracted from the original centroid so that completes one round of SGD on this K means quantized uh K means quantized weight. So uh when we are doing uh the linear quantization for both the weight and activations how do we do um quantization aware training? So we need to actually
+
+[00:39:10] maintain a full precision copy of the weight because this gradient is pretty small. it may not perturb you from one bucket to another uh bucket since it's too small. So the small gradients we need to accumulate them without the loss of precision. That's why during this process we need a a full precision copy of the weight which is in green on the top and then we pass it through the weight quantization operator and this is layer n minus one. We calculate layer n
+
+[00:39:41] by multiplying the input with the quantized weight and produce layer n and after the quant after the process we have to insert a quantization operator to quantize the activation as well. So we have both acti operator for quantizing the weight on the top and also quantizing the activation on the right. So this is called simulated or fake quantization because you still store the
+
+[00:40:13] full full precision weight on the top but you pass it through a quantization operator and um you obtain this quantized weight and you use this quantise weight to do the um forward and backward and these operations actually still run in full precision during the uh QA process [snorts] just the value is quantized.
+
+[00:40:45] And when we are doing uh back propagation, how do we obtain the um gradient? Actually, it's problematic if we um see the input and output of this quantization operator. Uh it's a step function for the quantization operator. For example, everything below 0.5 is quantized to zero. Everything between 0.5 and one is one. Um so the gradient is zero everywhere. That's the problem. That's the problem. You cannot learn
+
+[00:41:15] anything because after the chain rule once you pass through this quantization operator you lose the gradient. So the solution is called straight through estimator ST. This is very important concept. you simply pass the gradient as if there's no quantization operator as if this is a identity function. Okay, so gradient will stay the same as before. So here you pass through this weight
+
+[00:41:46] composition operator. You just keep the gradient as if nothing is over there. Uh so it's like a identity function. question. >> This is like two slides back, but how do you choose the distribution for uh your like centroids and the K means quantization? I think like when you had it was just linear, but >> you talking about this slide, how do you choose K means? So you are doing K means quantization, you just run the K means
+
+[00:42:16] on the um on the weight and you specify how many buckets do you need. For example, you have two bits, you want to do a number of cluster equal to four. If you have three bits, then the number of cluster equal to eight >> and you run k means >> as I I was asking like is the distribution of the centrids always linear. >> The distribution of the centrid >> this is not linear because minus one 0 1.52 this is not linear. It can be arbitrary. It can be a real number. It's
+
+[00:42:47] not a um integer. Of course, this is not integer either. You have 1.5. All right. So, let's continue discussion about quantization and wear training. We talk about uh STE. So, during the forward process, you have layer minus one. You have the activation there. You have the weight on the top. the weight pass through a weight quantization multiply it with the input and you pass through this um conf
+
+[00:43:19] everything in fruit precision you quantize the activation and you obtain output so that's the forward pass for the backward pass you just do everything reversely the only thing is for the quantization operator you use the pass through st [snorts] uh to simulate the uh gradient uh the gradient of the output is the same as the gradient of the input. So in this way we can recover the accuracy. So for um mobile nav v1 v2
+
+[00:43:52] nasn mobile um the middle column is post training quantization without fine tuning. The right hand side is quantization where training you can see the accuracy actually recovered a lot from 0.1 to 70 from 0.1 to 70.4. So quantization where training can play a big role. >> Um I have a question for precision. Are they the same value? Like do they default but just higher precision? >> Same value but just represented in FP16
+
+[00:44:24] or FP32 at the same value. That's why we call it the fake quantization. It's still represented in full precision but the value is um has been quantized including clipping or rounding those stuff. If you use if you use the same gradient [clears throat] for the input and the output is like how does it change? There's no problem with the propagating to get like gradient back. >> Oh, same gradient only refer to the quantization operator the blue operator.
+
+[00:44:56] So [clears throat] uh before and after this operator the gradient is the same but after the com operator the linear layer operator those whatever the gradient is that is or does not impact it we are just talking about the quantization operator using stable >> so you use the full precision gradient >> full precision gradient [snorts] >> are the optimizer states like typically full precision or lower precision >> oh that's a good point um we'll learn about whole lecture about how to do
+
+[00:45:27] finetuning on edge device and we will introduce how to quantize the activation the gradient everything to 8 bit integer so [snorts] there are many choices um for large language model we also talk about how to quantize the KB cache to 4bit all right so we recover the accuracy um now what's next we talk about linear quantization Now let's jump into binary and turnary
+
+[00:45:59] quantization using only one bit to represent all the three values to represent the weight. So binary and turnary quantization. [snorts] So let's see this matrix multiplication wig * xj that's a matrix vector multiplication. We give an example. The weight is 8 - 3 5 - 1. The activation is 520 one. So here the input and out and the weight are both real numbers.
+
+[00:46:31] Memory is 1x computation is 1x. We can binarize the weight. Okay. So 8 becomes one minus3 becomes minus one. Five becomes one and minus one becomes minus one. Just see the sign. The memory is only one bit. So there 32x less the computation. um is 2x less because you still need the accumulation. You just save the comput uh the the multiplication. So it's 2x
+
+[00:47:01] less computation. So binarization we can have either deterministic or stochastic. So deterministic binarization if the value is greater than zero then it's one. If it is smaller than zero then it's minus one. you can directly compare it with the threshold but usually stochastic binarization works better Q equal to plus one um with a
+
+[00:47:33] probability of P= equal to sigma R where sigma R is like this it ranges um if it is below minus one it's always zero if it's above one it's always one but if it's between minus one and plus one. Um that is linear that is there is a linear portion over there. Meaning that [clears throat] if you're very negative then for sure zero. If you're very positive then for sure you
+
+[00:48:03] are you're positive. You're one but in the middle there's a linear region. You can be one you can be zero. But if you're closer to one you have a larger probability of being one. But you can also be zero. But it's harder to implement because generating random number is expensive. So let's try to minimize the quantization error uh during
+
+[00:48:35] binarization. So if we directly binarize that by comparing with zero, we get a quantization error of 9.8 8 28 but can we apply a scaling factor? Okay. So uh how to calculate the scaling factor? We want to maintain the average value to be roughly the same. So original tensor you can calculate the average value and we can calculate the alpha which is the scaling factor to be
+
+[00:49:06] the average value of the weight weight norm. So here uh we find with no uh the scaling factor should be 1.05 because that's the value of summing up all the entries in W1 and divided by 16. So in that case we can decrease slightly decrease the quantization error by inserting this uh scaling factor and the new quantization error becomes 9.24 24.
+
+[00:49:42] And so um using this approach just by injecting this new scaling factor uh we can drastically reduce the um delta of the error loss accuracy loss. Okay. So far we just quantized the weight. What about quantizing both the weight binarizing both the weight and activations? So in this familiar example both the weight and activation becomes binarized. So it's uh positive one minus one positive minus one dot product with one
+
+[00:50:14] one minus one one and let's compare um the lookup table for the x no operation. You have taken the computer architecture class before. So external operation if both inputs are the same then output is one. One one gives one. 0 0 gives one. If the inputs are different one zero or 0 one it gives zero. You can see that actually um mimics very well with the pattern of um binary
+
+[00:50:47] multiplication. So a time b if it's one one the multiplication is one. One minus one the multiplication is minus one. Okay. So they are exactly the same pattern except that we are replacing minus one with zero in xor operation. [clears throat] So how about let's try to replace it with xor operation. So 1 one * 1 becomes 1 x one and minus one * 1 minus one is converted to zero.
+
+[00:51:19] Okay. So it becomes zero x one and you sum them up you find oh unfortunately it's different. So what can we do to make it the same? How to make it the same? Um so there is a shift. Um let's assuming everything has a bias of minus one all together you have minus4 minus4 um you multiply the original result okay by
+
+[00:51:51] two and add this uh this bias which is minus4 actually you can find uh they match each other uh pretty well so let's see if it is general so this is the general case you can just do the x no operation between w and x the weight and activation you ignore them you sum them up multiply by two and I this bias the bias is minus n how many entries do we have
+
+[00:52:25] so in this case we do the actual operation we multiply by two and then we add the bias minus4 the result is minus2 which is exactly the same as the original operation Uh what is good about this? So it's just doing the pop count. What is pop count? The counting how many z how many uh ones are there in your array. Like array is one 0 0 and the pop count is counting how many ones are there.
+
+[00:52:58] And this is very easy to implement in hardware for pop count. Uh so the final equation becomes pop count w xord with x okay and multiply by two is very easy to implement. We just shift it by one bit and then minus n is the number of entries. So do we need multiplication um hardware? Do we need addition hardware? In this case we get rid of multiplier
+
+[00:53:30] right? There's no multiplication. You just have xore operation. And do we need um adders? We replace that with pop counting return number of ones. So the operations we no longer have addition, subtraction and multiplication. Now we have only we only need exore operation and pop count. And for each register you have 32 bits. Each bit can do a individual operation.
+
+[00:54:00] So you have you can have this register level parallelism one bit. So the memory is 32 times less the computation roughly four 58 times less because you say both computation and addition But what about the accuracy uh degradation? So this is Alex net comparing battery wave network um and axor xor net.
+
+[00:54:34] So the bottom two are quantizing both the weight and activation. The xor net can be a lot better than the binary network. How about we can add the zero? So we can have not only positive one minus one and let's add another centrid which is zero. So if the input is greater than a threshold delta is RT. If it is between minus delta and positive delta is zero.
+
+[00:55:05] It's smaller than minus delta is minus RT. Right? So in this case we can quantize this tensor to zero + one and minus one. Again we want to keep the average value the same. So the scaling factor is um you can calculate actually this delta has a magic number usually it should be the 0.7 times the expected value and using this we can calculate the top accuracy for full precision model about
+
+[00:55:37] 70 uh one bit binary network is about 60 while the turnary is about 65 it's in the And we can do this make this better by being able to train these two centroidid. Um we published this paper about 10 years ago called train the turnary uh quantization. This is original weight full precision weight and this is the normalized full
+
+[00:56:08] precision weight between minus one and zero and positive one. You can see there are three colors. Everything below minus t is becomes minus one. Between minus t and positive t that's zero. Above positive t that's that's one. Okay. And we quantize that. And here we are learning two scaling factors. One wn will modulate the minus one. One wp will modulate the positive one. So in the end we can have minus wn and zero and the
+
+[00:56:41] positive wp. Uh in that case we can increase the accuracy a little bit compared with the turn turnary width network from 65.3 to 66.6 and recently people also have been doing this turnary network for large language models. Okay, so this completes our summary about different quantization precisions
+
+[00:57:12] from floating point to k space quantization where only the weight is quantized to both the weight and activation is quantized to linear and also binary and the turnary quantization. The natural question becomes different layers are very different in the sensitivity. Like we mentioned in pruning, some layers are very sensitive to pruning. If you just prune a little bit, the accuracy drops. Some layers are not quite sensitive to pruning. Uh you can prune a lot. Uh how do we deal with
+
+[00:57:44] that for quantization? A similar phenomenon appears actually rather than quantizing every layer to be like 8 bit or four bit indeed different layers should be quantized differently. Some of them may be very sensitive to quantization like the first layer usually. But there are so many choices right? We can um have eight choice for the weight, eight choice for the activation. For
+
+[00:58:16] each layer you have 64 choices, then you have n layers. You have 64 to the power of n. You have so many choices. [snorts] So the design space is too big. How do we deal with that? So we um again use something similar to what we did for AMC the auto and the auto model compression. Here we can use actor critique model and build a reward function to give you the feedback with the hardware aware
+
+[00:58:47] simulator hardware accelerator as the simulator so that you can get the latency you can get the accuracy at the same time and plug it into the reinforcement learning engine. Using this approach called hardware aware quantization you can have a um using the same latency you can have a higher accuracy or the same accuracy you can have a lower latency and using this engine you can easily have different constraints like model
+
+[00:59:18] size constraint latency constraint or energy constraint. This was done roughly eight uh eight seven years ago. But nowadays if you plug it into uh codeex or cloud code just use slashgo for example you want to constraint the model size and optimize constraint the um model size and optimize for latency you can just um given that constraint your goal is to minimize the latency I'm sure the model will um instantly just in a few minutes
+
+[00:59:51] give you a very good answer and these all outperform um human based uniform based um uniform um quantization based approach. Okay. So here is a summary for today's lecture. We reviewed linear quantization and then introduced the PTQ methods post training quantization approach without fine-tuning. Okay. So we introduce how to calculate the scaling factor and per
+
+[01:00:23] tensor versus per channel quantization. We introduce the important format Nvidia's NVIP4 format and also IMX IP4 MX IP6 etc. We also talk about how to calculate the dynamic range. Should it be it should be neither too small or too large with a sweet spot in the middle. And then we talk about how to use QAT to do a fake quantization and also do um pass pass through pass through the
+
+[01:00:55] gradient to estimate the gradient during quantization where training using the straight through estimator. We also introduced the binary and uh turnary quantization. The most interesting part is probably how to use the x operation plus the top count uh without any multiplication without any addition uh to calculate uh the matrix multiplication. Okay. And finally mix precision position. So after this lecture you will be able
+
+[01:01:25] to complete the quantization lab and hopefully you are enjoining the pruding lab. If you have any questions, feel free to let us know. All right, that's all for today's lecture. From next one, we will introduce the next chapter, which is neuro architecture search. [applause]

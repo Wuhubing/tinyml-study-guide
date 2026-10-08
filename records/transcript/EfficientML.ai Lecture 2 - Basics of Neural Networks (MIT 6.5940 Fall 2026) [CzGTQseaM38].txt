@@ -1,0 +1,226 @@
+EfficientML.ai Lecture 2 - Basics of Neural Networks (MIT 6.5940 Fall 2026) [CzGTQseaM38]
+Source: https://www.youtube.com/watch?v=CzGTQseaM38
+Language: English
+Transcript source: YouTube automatic captions; unedited.
+
+[00:00:03] All right, good afternoon everyone. Uh let's get started with lecture two of efficient ML which is basics of neuronet networks. So in the previous lecture we went uh through how much computation is needed for different kinds of AI applications ranging from language to vision to multimodel models. So today we are going to dive deeper into this topic. So uh a quick over review of the supply and demand for AI computing. So
+
+[00:00:33] in this chart we are showing that the computing demand is growing uh very fast uh for the couple for the past decade. While the supply of computing especially measured in the amount of memory available in the GPUs is is also increasing but at at a much slower rate. So that creates a big gap between this supply of computing versus the super fast demand of computing and the gap is actually quite large. Uh if you were
+
+[00:01:03] want to uh buy the black well GPUs these days it's very hard to buy the card available in the market. If you rent uh the GPUs it's also pretty difficult. Uh some of the older GPUs uh even is renting at a higher price than when it was it was uh manufactured. So Jens mentioned it was like a wine. You can hold it for a long time. The value is preserved and even appreciate. Um this is just showing um this huge gap between um the supply versus demand for
+
+[00:01:34] computing and it is super critical to provide more compute and also make AI models more efficient that require less compute. In this lecture we are going to cover the following aspects. We are first going to uh review the terminology of neuronets and review the popular building blocks of a neuronet network such as the fully connected layer, convolution layer, group convolution, depress convolution, what is pooling, what is normalization, what is a
+
+[00:02:05] transformer. Actually we are going to dive much deeper into the transformer architecture in the second half of this class which is a new um a very important architecture widely used these days not covering this lecture but in the second half and [clears throat] we are going to review a few uh classic means old architectures like Alex VG [cough] and the next topic [clears throat] is quite important we are going to talk about efficiency match
+
+[00:02:36] metrics. In order to optimize for the efficiency, we need to first define what is efficiency, right? How to count number of flops, how to count the model size, um data movement, latency, throughput, bandwidth, those terminologies. And for the last part of lecture, um our co-instructor Sean will give a tutorial how to use PyTorch. We also uh released lab zero today.
+
+[00:03:08] Okay. So lab zero will be uh a tutorial about pytorch lab exercise how to count flops uh GPU basics um those kind of stuff. So um this lab will not be graded. It's intention is for everyone to get familiarize yourself with how to upload a homework in the in the system and get and get familiar with um PyTorch as well as Google Collab so that you can prepare get prepared for the future
+
+[00:03:39] labs. All right. So neuron and synapsis. Um so in a synapsis um there is actually a which basically map to the activation it pass the signal from one uh synapse to another. Okay. [snorts] So from the input axon is going to be combined using a weighted average approach. So the weight is basically the synapse and if the weighted average is
+
+[00:04:12] larger than a threshold which is basically the activation function then the output axon will be will be fired. So this is similar to uh the biology an this is the biology analysis of a deep neural network where you have many layers and each layer have weight and activations. The width of the model is basically how many um activations do you have and the depth of a neuronet network is basically how many layers do you have
+
+[00:04:44] and in each layer a neuronet network is going to combine the input signals using a weighted average approach and the weight will be stored and the popular terminology model science is basically counting how many weights are there. So weight synapses and parameters these words are used interchangeably meaning the weight and neurons features activations these are used interchangeably meaning the activations.
+
+[00:05:15] So in this example, this is a three layer neuronet network with two hidden layers. Popular neuronet network layers. Of course, the most popular is the fully connected layer. Even on like modern uh GPT model, fully connected layer is still the bread and butter, the basic building block. So what are the basic components? You have input feature, you have output feature and you have the weights and biases. Uh in this example, the input
+
+[00:05:48] feature is one by CI. I for input output feature is I by CO or for output weight CO by CI map each output combine each output with every input. That's why CO time CI weight. And finally, there is a bias. you add a bias to each of the output. [laughter] Therefore, the dimension is the same as CO. So on the bottom right corner and see
+
+[00:06:20] this is the basic operation um for processing one input. It's a matrix vector multiplication. The input is CI. The weight is a CI by CO which maps the CI input vector into a CO output vector. Okay. So when you have multiple inputs um the input dimension will become n rather than one. So top or bottom right corner now you have two rows. Um so two
+
+[00:06:53] inputs corresponding to two outputs. Previously it was matrix vector multiplication. Now it becomes matrix matrix multiplication also called batching. uh in practice batching is a very effective technique to improve the efficiency of GPU computing. Uh why is that? Because you fetch the same amount of weight um which is about majority of the time consumed but now you can process more input. So processing two
+
+[00:07:26] input and processing one input you have to fetch the same amount amount of weight but the time is roughly the same. So it's a good idea to b to batch multiple requests at the same time. But as you can imagine, if you have to batch, you have to wait [clears throat] for multiple requests to come to you at the same time, right? So some users have to wait for another user before the batch size is good enough, it's large enough. So that's a trade-off between um the how long you have to wait versus the
+
+[00:07:58] the efficiency. So in the later part of the lecture we are going to uh talk about dynamic batching technique which is popular serving technique in large language models. Okay. Next we have the u convolution layer. Let's start with 1D convolution and then 2D convolution. So previously in fully connected layer each output is connected to all the input. Um it has a lot of weight. What if we don't let every output to connect
+
+[00:08:30] to all the input? So for example um we have the channel dimension and the spatial dimension which is the input and then we have a filter which is CI by KW. So we can uh um map this input to for element wise you convolve you multiply with each element of the f fil filter together with each element of the input sum them up and you produce one output
+
+[00:09:02] element and if you have a second filter you can produce the second channel of the output when you have a third filter you can produ produce the third channel of the same output. So, so far you just produced one output element with [clears throat] three channels [snorts] on the right hand side which is right here. You have three filters and you produced three channels of a single output. What if we want to produce multiple outputs?
+
+[00:09:33] We just shift the input. When we shift it by one, we can produce the second output which also have three channels. Then we can shift another time and then we get three output. Each output still have three channels. So that's why the output is 3x3. So this 1D convolution is quite widely used in 1D signals such as voice and speech. We can also make it more general to do 2D convolution. So in this example on
+
+[00:10:05] the bottom uh we have a uh 3D block but it is actually uh like a 2D image should be represented by a 3D block because you have the channel dimension like RGB you have three channels. So don't be confused why 2D convolution will come up on a 3D tensor because one of the dimension is the channel dimension. So in this case this horizontal is the is the channel dimension.
+
+[00:10:36] Okay. So we also call it each one output feature map. So now we have a filter which is KW by KH by CI for input. We apply the f filter to the uh first uh KW by uh KH by CI input. We produce one output. And then we have a second filter producing the uh second channel of the same output. And the third filter is going to produce the third channel of
+
+[00:11:07] the output. So so far we have just one output. To produce the second output, we shift the input by one [clears throat] and shift by another one. Then we get a third output. Then we shift it down. We get the second row of the output. Continue. and shift again third row second element third element. So in this [clears throat] case we finished the convolution on the input uh which is
+
+[00:11:37] 5x5. Now we get an output which is 3x3. So what is the height and width? While we are missing two of them the input is 5x 5 the output becomes 3x3. So the general relationship between the output height versus the input height is the ho which is output height equal to the input height minus the kernel size and plus one because when you shift you
+
+[00:12:09] lose uh you lose kernel size minus one. So the that's the relationship between the output shape and input shape. When the [clears throat] input is five in this case kernel is three. So 5 - 3 + 1 you get three. So the output is three. Input is five. [laughter] Um so what if we don't want to um make this feature map getting smaller over convolution. You want to keep the same
+
+[00:12:41] um feature map size. What do you need to do? So that's padding. You can pad the input. For example, um in this case you can uh pat a 3x3 input which becomes 7 by seven. This example you can do zero piping. You can do many different padding methods. Uh therefore the output shape will become the output shape will become like this.
+
+[00:13:13] Okay. top right corner it's no longer input minus k + one but input plus 2 p p for padding size for example previously um we are uh doing a convolution input of three input of five output of three but we don't want the output to be three we want the output to be five okay so you can type one p equal to one so in that case uh you no no longer have uh output sides of three the apple size
+
+[00:13:44] becomes five. There are many different other padding approaches not only zero padding but also reflection padding. Um for example you have one two three on the original image and the padding will be 3 to one the reflection padding. You can also do replication padding like replicate the closest one that's the right hand side. Another important concept is the receptive field. So in order to
+
+[00:14:16] understand the image, you don't want to just look at a certain pixels. You want to take a look at the entire image. So you really need a bigger receptive field to understand what is in the image. So in this case we have a kernel size K and we have a L layers. So the receptive field with kernel size K and last and L layer is L * K minus one + one. [clears throat] So each convolution layer is going to
+
+[00:14:46] add K minus one to the receptive field size. For example for L equal to two two layers kernel size equal to three. What is the receptive field size? is five because you have two layers and each layer t minus one is two and 2 * 2 + one that's five. Similarly, you can calculate for three layers kernel size
+
+[00:15:18] equal to three the receptive field is seven. So the problem is for larger images you need a lot of layers so that you can see the whole image. uh what can we do um such that we can use just a few layers to see the entire image and the answer is just don't sample okay and use strided convolution. So what is a strided convolution? Um in
+
+[00:15:49] previous examples every time when we convolve we just shift by one we can also shift by two or shift by three. So [clears throat] we shift by a stride. Okay, so that's called strided convolution. You can um skip more so that you can quickly get a smaller uh you can quickly get the output but output size will be smaller and in that case you can quickly have a larger receptive field. Uh when you have a stride of two roughly you can have a
+
+[00:16:20] 2x receptive field. So with the uh striding with the stride the new equation for the um um output height would be the input height plus 2p minus k divided by stride. When you have double the stride you have half of the uh roughly half of the output size. So far we are talking about all the
+
+[00:16:50] channel of a convolution layer of the output will be connected all the input channel of the same convolution layer. Uh so this can lead to buffer redundancy. So can we just force um [clears throat] only for example the first half of the channel only talk to the first half of input the second half of the output only talk to the second half of the input. So that's the grouped convolution layer. Okay, in this case we have two groups. Channels within the
+
+[00:17:21] group talk to each other. Channel in different groups don't talk to each other. The extreme case would be you have n channels then you have n groups. Okay. So none of the none of them has more than two groups. So it only talk to um themselves from the input CI to the output CO and the number of input channel will be the same as the output channel. There's no between channel
+
+[00:17:51] cross talk and actually this depth wise convolution layer was quite popular uh roughly 10 years ago during the mobile net era before transformer become popular. There's another layer called a pooling layer. So for example, if you want to do max pooling in this case, we have a 2x two um block in this case and we are going to pick the largest one within the block. So the blue block will pick five.
+
+[00:18:24] For the uh yellow block, we are going to pick seven. Another popular approach is to do average. For example, for the blue block, we are going to average all the elements and get a two. And for the yellow blue block, we are going to average them together and get a four. Another popular layer is the normalization layer. So in a layer in a certain dimensions, you have some very
+
+[00:18:55] large element, some very small element. So you want to calculate the mean of uh this element you subtract the mean and divide it by the uh standard uh dev the standard deviation so that you can normalize the layer. There are many uh ways to normalize the layer basically from different dimensions. You can normalize you can do batch normalization which is very popular. We normalize in the batch dimension. You can do layer
+
+[00:19:25] norm. The second is instance normalization, group normalization. So the the similar they they share the similar principle um minus subtract the mean and divide it by the standard deviation but they use different set to calculate the mean and standard deviation. And finally you have a learnable alpha and beta to linearly combine um the input and output.
+
+[00:20:00] All right. Another um layer is the activation layer. So all the previous layer we talk about are linear layers. Now we need nonlinear layers as activation function. Um popular approaches are using sigmoid. See the uh top left corner. which is y = 1 / 1 + e to the minus e minus x value layer which is very popular zero um for everything below
+
+[00:20:31] zero and there will be y equ= to x for everything above zero and the problem for redu is that we can have a pretty large dynamic range ranging from zero to infinity so quantization will be become difficult question I would [clears throat] want to ask uh you show you showed the the example of convolution in 2D uh and my question is can I have a kernel that produces one output through throughout
+
+[00:21:03] multiple channels. So I go uh in the in the image but also uh take in multiple channels uh into the convolution. So the convolution currently combine all the input channels into one output channel. That's the function of one kernel. And you have a second kernel combine all the all the [clears throat] channels into the second output channel. >> Oh, >> they already combined two channels. >> Yes. Thank you.
+
+[00:21:34] >> Okay. So the problem redu is that it has a very big dynamic bridge and this is y equal to x for everything above zero. So the range will be from zero to infinity. That creates a problem for quantization. If you have a limited um code book, we'll talk about later in the lecture. Um you have a pretty big dynamic range. So people come up with idea to limit it cap it to six. Uh that's what is called redu six on the top right corner. So if
+
+[00:22:05] it is above six, you cap it to six. Another problem for the red activation function is the gradient will be lost. Uh the neuron will be dead um if it is below zero because uh it will be always be zero and there will be no gradient you cannot change it. So it's called bad. So that's why people come with give it a small slope. If it is below zero and the slope is completely ty
+
+[00:22:38] you still have the gradient if the value is smaller than zero people come also come with the swish function it's very similar to red but the gradient is non zero everywhere but the problem is that you have to calculate a lot of e to the power of minus x and division which is not quite computationally efficient. So when designing components of neuronet networks, you always have to keep in mind about hardware efficiency and
+
+[00:23:10] co-design accuracy [snorts] with the efficiency. So in order to cope with the computational inefficiency issue of the swish uh function, people come up with the hardest wish. So it's um if if x is smaller than minus minus 3 is zero. If it's greater than three is x and in between is x * x + 3 / 6. All kinds of magic numbers. Uh still look similar to
+
+[00:23:41] uh uh to the red function but the gradient is 90 making it easier to so hard switch is also quite popular. You can see it only require a linear function x those are easy to compute. And finally transformers. So since 2020 2017 transformers becomes very popular. Um so it has different components from input
+
+[00:24:12] embedding to multiight embedding multiight attention and [clears throat] normalization and feed forward and then repeat and attention mechanism. Basically you have query key and the value QK transform or QK transform normalize it pass it through the soft max times V that's the attention and use the attention basically give you the um weight to combine different values so that's also called attention score you
+
+[00:24:44] use that attention score to combine the values we are going to dive deeper into transformer in the second half of this lecture so we have just one slide here. All right. Now, let's go through a few popular scene architectures. First one is Alex Net since 2012. The input has 224 by 224 width and height with three channels. So, it first passes through a very big
+
+[00:25:15] convolution kernel 11 by 11 convolution. So, you can have a pretty big uh and receptive fuel and we can calculate the output uh height and width using our equation. It quickly down sampled from 22 224 to 55. Uh because we have a pretty big stride here equal to four. Why we are going to have a big stride in the beginning? Because the future map size is quadratic
+
+[00:25:47] with the side of each side, right? So we want to quickly reduce the uh dimension. So they use a strer 4 in the beginning to uh save the activation size so that you can squeeze uh the activation into GPU. At that time GPU was memory was pretty small. I remember was roughly four four gigabyte. You can imagine 4 GB of GPU memory during that time. Actually when I was doing PhD we play with like 8
+
+[00:26:19] GB something like that. It's pretty limited amount of GPU memory and then it pass through a 3x3 max pooling layer. So a str of two and then you have a group um convolution. We just mentioned not every uh channel talk to each other but only within the group they talk to each other between the groups they don't talk to each other so that you can save the weight and so on. You have uh you can use the
+
+[00:26:51] same equation to calculate the size of the every five convolution layers and finally lay it has three linear layer the dimension is 4k final output layer dimension is 1k because you want to classify 1000 classes of image. Another um popular architecture is VG16 that came in 20 2014 actually when it just came out u I was in the second
+
+[00:27:22] floor of gates building at at Stanford out uh we talked about this model we feel super excited because uh it's very easy to implement every layer is the same is 3x3 uh convolution um and the channel size is very regular from 64 4 to 128 to 256. Computer science people like this kind of number right around is always total to total power or something and
+
+[00:27:52] convolution kernel size is always 3x3 unlike x that you have 11 by 11 kernel you have 5x5 kernel you strate convolution all kinds of stuff from implementation perspective or building a hardware accelerator perspective this kind of regularity is so good for 100 people. Um but the problem is that it's very bulky. The model is pretty big. Um and finally you still have lots of fully
+
+[00:28:23] connected layer in the end. Um at that time actually that inspired uh several hardware designs very specialized for 3x3 kernels and people believe that's the future. We want to just is fully specialized for 3x3 convolution since if you combine two 3x3 convolution that's basically a 5x5 convolution. Uh but later um the community realized programmability and funability is just
+
+[00:28:54] so important. Um we don't want to have so much specialization when the algorithm change the hardware suddenly become obsolete. So that's a lesson uh we learned during this process. Right? So programmability is just so important. The model architecture keeps evolving. You want to maintain the flexibleness. Uh so that when whenever new architectures come out, the hardware can support it and GPU is very good at it. The dig 16 because you have 16 layers.
+
+[00:29:24] Now if you have 16 layer that feels pretty shallow at that time 16 layer feels very deep and each layer is the same convolution batch norm followed by [snorts] about 10 years ago uh that's a big uh evolution res 50 came out which introduced this bypass branch okay it's a it's called residual branch uh which is learning the residual okay the y equal tox X is basically pass through
+
+[00:29:55] the residual branch and the remaining part is basically learning the delta. Learning the delta is always easier than learning itself. Actually recently uh KB came up with came out with uh rather than just have a residual single branch you can have the attention mechanism for residual attention which is a very natural extension for that. For each googy block it consists of one by one convolution, 3x3 convolution and another one by one
+
+[00:30:26] one by one convolution. The function of the first one by one convolution on the top right corner is you want to reduce number of channel. You have a lot of channels you don't want to feed it to 3x3 convolution which is pretty heavy. So before heavy lifting you want to make it lightweighted. So they use a one by one convolution to reduce the channel number. So according to our equation, one by one convolution doesn't change the dimension of the X and Y dimension, but it's going to change the channel dimension. So we use the one by one
+
+[00:30:57] convolution to make the channel smaller and divide by four before you do the heavy lifting, which is the 3x3 convolution. And after the 3x3 convolution, you are finished with the heavy lifting. Then you have to uh up increase the channel from m / 4 back to n so that you continue with the next layer. So this is the residual branch where the
+
+[00:31:27] number of channels doesn't match. If it doesn't match you cannot directly have a wire to do element wise add but you want to do a one by one convolution to match the number of channels. That's why uh from between different blocks um the architecture is a little different and then people want to deploy these models on mobile phones. So uh mobile net v2 from Google was quite popular about 10 years ago. It widely uses this
+
+[00:32:00] deprise convolution as we discussed. Um for group convolution only within the group channels talk to each other and an extreme case is the deprise convolution where every channel only talk to itself for the input to the output but not between the channels. And since the computation is very lightweighted for the depth wise convolution layer I like reset which does support the layer using one by one
+
+[00:32:31] here is going to uh increase the number of channels by one by one convolution from n channels to n time six channels. You want to expand the number of channels so that you can have enough capacity. And since the concepts convolution is so lightweighted, you can tolerate six times the number of channels. And after the 3x3 evapor you use another one by one to reduce the number of channel back to channels.
+
+[00:33:06] Okay. So let's switch gear to the second part. Having talked about so many uh neuronet network architectures uh we need to define the efficiency metrics. How do we measure whether this model is good or not? Is efficient or not? How should we measure the efficiency of neuronet networks? So we are going to quantify them from three perspectives. We want a smaller models. Okay? So that if you develop an app, you can easily upload it to the app
+
+[00:33:38] store. If you want to download the latest model on your Tesla from the overthe-air update, you don't want to waste a lot a lot of LT bandwidth, right? So smaller model definitely helps and you don't need a large disk to store so many weights [clears throat] more than like Kim model has more than two two trillion parameters. You need a pretty large disc to hold them. So smaller model definitely helps. And then we want a faster models so that
+
+[00:34:10] you can serve um more users um get response more quickly and also greener models so it's um more power efficient. You don't want to drain the battery of the phone very quickly. If you run the model locally on the phone large scale data center, you usually have a fixed amount of electricity the power budget one gab something like that. um the more compute you can squeeze into the fixed amount of power budget the
+
+[00:34:42] more intelligent intelligence you can produce. So we want a greener model. So these are [snorts] the three aspects we want to we care about. So smaller models means we need less storage. Faster model means we have shorter latency and greater model means we need less energy. And these all boil down to two aspects. One is computation, one is memory. One is doing the weight lifting, doing the
+
+[00:35:12] work, doing the arithmetic, one is moving the data. So we categorize all the metrics from these two perspectives computation and memory. For memory related metrics, we have the number of parameters. How many weights do we need to store? What is the model size? which is basically number of parameters times [clears throat] how many bits do you need for each parameter and activations there's total activation
+
+[00:35:42] there's also the peak activation they are actually different there's also computation related aspects one is MAC multiplication and accumulate flops floating point operations floating point operations per second sometimes people call call it operation since it may not be a floating point. Sometimes we can quantize it to integers. So general arith general name is op or ops operations per second.
+
+[00:36:14] So let's go through one by one. So what is latency? So here is a straightforward give you some intuition about long latency and low latency. Uh this is doing segmentation. segmenting the road, the people in red and the trees in green and the cars in in blue. A slower model has higher latency. For example, uh 600 and 38 milliseconds to prod to process each frame. you can feel
+
+[00:36:45] it's it's stuck versus like the efficient VIT we did about two or three years ago consume only 40 46 milliseconds for each frame which is low latency. Another concept is throughput. How many images how many tokens you can process for a given amount of time. So low throughput on the left hand side in this example we can process six videos per second and on the right hand side after
+
+[00:37:18] the TSM our work about seven years ago by G's current and magnet lab has a high throughput of 77 uh videos per second. So you can process more videos using [snorts] the same GPU um at a higher throughput. So latency versus throughput are they the same concept they both mean faster but actually they are different. Let's see how they are different.
+
+[00:37:48] Um in the first example we are processing images one by one. Each image require 50 milliseconds to process. So in this case the latency for each image from the beginning to when you have the result that is 50 milliseconds. Now what is the throughput? How many images can you process per second? Since it's processing one by one each one takes 50 milliseconds. One second is 1,00 millisecond. Then you can process
+
+[00:38:20] 1,00 divided by 50. That's 20 images per second. So that's the throughput. On the right hand side, we have four engines processing the image in parallel. Each one is slower. It takes 100 milliseconds. [snorts] But four of the four engines are running in parallel. So the latency from beginning to end for image processing is 100 milliseconds. But what about the throughput for one engine? Um it takes 100
+
+[00:38:52] milliseconds. Um see in one second it has a 10 um can process 10 images from one engine but now you have four engines running in parallel. So 10 times four can process 40 images per second. So actually the second scenario has higher throughput but lower latency. The throughput is 40 compared with the last one which is 20. So doubling the throughput while the latency is 100 millisecond versus 50 millisecond. So
+
+[00:39:25] it's higher latency. So the higher throughput actually doesn't translate to lower latency. In this case on the right hand side the higher throughput actually um means um actually has higher latency and does lower latency translate to higher throughput which is the first case right has lower latency it doesn't necessarily translate to higher throughput because it has only one engine running versus in
+
+[00:39:57] the right hand side it's a four engine running internally. [clears throat] So neither of them translate to each other. So what can we do to reduce the latency? Actually we can overlap um computation versus data movement. In this case we have to load the input uh we have to load the weight. We have to do computation like doing convolution or transformer
+
+[00:40:29] and then we store the output. While while we are doing the computation uh we can actually load the input for the next image. So we can overlap them pipeline them. So the latency is the max of two aspects like we mentioned one is computation one is memory access one is arithmetic one is data movement. They're the same. >> [clears throat] >> So what about the computation? So that is equal to the number of operations in a neuronet network model divided by how
+
+[00:41:01] many operations this processor can process for each second. So that's the time on computation and the number of operations you can process per second that's hardware specific. Well, the nominator um that's neuronet network specific for the second aspect the t memory also have two part one is the data movement for the activations one is data movement
+
+[00:41:31] for the weight since you have to deal with both of them and the the data movement time for the weight equal to the model size how many parameters do you have divided by the memory bandwidth of the processor whether you have hpm You may have a larger bandwidth, you have DDR, you may have a smaller bandwidth. Again, um the denominator is hardware specific. The denominator is neural network specific. While the data movement for the activations is similar, just the data
+
+[00:42:02] movement has two component. One is input activation, the other is the output activation and divided by the bandwidth of the processor. You have the data movement time. Well, I do want to share you a concept that computation is cheap, memory is expensive. Um, I collected this figure um when I was at Stanford and the original data was referenced from my code advisor Mark Horowitz. This is showing the operation energy across uh
+
+[00:42:33] addition multiplication accessing register file and accessing DM memory doing 32bit integer add under 45 nanometer that's only 0.1 plej um floint more expensive 0.9 accessing register file one plej 32-bit integer multiplication three ple it's all single digit ple [clears throat]
+
+[00:43:04] but when you go to the ramp you access the memory that's 640 pure you have two orders two orders of magnitude more energy is required to move the same same amount of data from the duran memory to the processor compared with just doing addition and multiplication on top of So any approach that uh save the computation but doesn't quite save the memory bandwidth is not going to help
+
+[00:43:35] much. Uh but saving the data movement uh is actually super helpful. That's why um um memory is just become become so important um for the co-design of new network architecture with the hardware architecture. It's more than two orders of magnitude more energy is consumed when you are moving the data. So whenever you are designing new accelerators, new hardware or when you are designing new neural networks, just keep in mind uh computation is cheap,
+
+[00:44:08] data movement is expensive and they are consuming energy. All right. So, um let's go through the memory related efficiency matrix. The number of parameters. How do we count the number of parameters in a neuron network? So the parameter is um the number given a new network um the elements number of elements in the weight basically for
+
+[00:44:39] fully connected layer you have an I is CI is the input channel CO is the output channel the number of weight is easily calculated as [clears throat] CI time CO so that's very easy everything is connected to everything so you have CI time CO what about for convolution So N is the match size. CI for input channel. CO for output channel. And we have the height and hi and ho and wi and wo for the um
+
+[00:45:11] input and output weight and k um kh and kw for kernel size g for the group. So for convolution in order to get each output um how many computations needed you need to compute um in 3D right KW KH times the input dimension input channel dimension time CI so that's producing each uh element for the output and you have CO elements so that's why you have
+
+[00:45:43] al also have to multiply by CO to calculate um a single element in the output. And for grouped um for grouped convolution um the amount of memory uh the amount of parameter is divided by G because you have G groups. And for depth convolution the number of group equal to the number of channels. So they cancel each other. Therefore you
+
+[00:46:13] have only uh KH * KW. as the uh kernel dimension h times kernel dimension w and time c. So let's use that to calculate the number of parameters for alexnet. Uh the first layer is 11 by 11 kernel. The input channel is three output channel is 96. So the number of weight is equal to multiplying these four terms together 11 by 11 times three input
+
+[00:46:44] channel times 96 output channel. Uh similarly you can calculate the second layer except that now you have a group equal to two. So you divide the number of weights by two because now you have two groups they don't talk to each other. Similarly, you can do the calculation for the remaining layers. The last three layer is easier because it is a fully connected layer. So, everything add up to about 60 or 61
+
+[00:47:16] million parameters in total. Okay. So, let's now talk about model size. Uh model size is basically measuring how how many bytes do you need to store the weights. Uh it's very easy to calculate if you have the number of parameters already. It's basically the number of parameters times how many uh bits do you need for each parameter. If you're using four bit full precision is
+
+[00:47:47] basically four bytes per parameter. And if you're using just 8 bit integer or uh 8 bit floating point uh the model size is basically number of parameters times one. And if you are using only four bit like we like we used in our homework in lab lab four or lab five the model size equal to the number of parameters divided by two. For example, if you are going to work with a 14 billion parameter large language model using
+
+[00:48:19] four bit what's the model size? Seven gabyte 14 billion parameters. Each one is four bit. Four bit is half a bite. So six 14 times times half. So that's seven gigabyte. If your memory is larger than seven, then you can fit the model. So which motivate us to learn about quantization. How to reduce the bit width for each parameter.
+
+[00:48:51] We're going to talk about that in lecture three and four. In this example, Alexet has 61 million parameters. If all the weights are in 32 bit, then the total storage is 61 million parameter times 4 by for each weight you have 224 megabyte. If all the weights are stored in 8 bit representation like 8 bit integer or 8 bit floating point 61 million times one
+
+[00:49:22] by per parameter which is 61 mgabyte and next let's calculate uh activation [clears throat] size total activation versus peak activation size. U actually they are very different from the the parameter size as we can see um the activation um could be a memory bottleneck in the inference not the parameters on the right hand side it's showing the
+
+[00:49:52] parameter reduction from ResNet to mobile net that's a huge reduction actually 4.6 6 times reduction to reach the same accuracy. However, the peak activation size didn't decrease but actually increase. Um that is because in mobile net um actually you have to expand the number of channel by four times or six times during depth convolution to give it enough capacity. Although it saved the computation by
+
+[00:50:23] depos convolution, it actually increased the amount of activation required by 1.8 times. Actually the activation is also imbalanced. So the memory required to hold the the [clears throat] memory is dependent on the largest layer. So in this case the second block the peak memory is the largest. Well for microcontroller if you want to deploy
+
+[00:50:53] these models on IoT devices which has only 256 kilobyte of memory the first couple of layers those are becoming the bottleneck. And we are going to learn technique in the this lecture future lectures. How do we uh deal with this imbalance is you should cut the memory so that it can fit uh 256 kilobyte of memory. Um so during training um the activation
+
+[00:51:23] is the nor memory bottleneck actually for convolution neural networks. uh here we are showing the memory on the left but pick the parameter on the left and activation on the right. So from resident 50 to mobile net the number parameter reduced a lot by four 4.3 times from 102 megabyte to about 26 20 25 megabyte. uh but the peak memory didn't increase
+
+[00:51:54] much didn't decrease much only 10% difference and if you see the distribution for um the weight memory versus the activation memory they are having this um different trend where [clears throat] the activation is first pretty large in the input because the hnw is pretty large the down the image hasn't been down sampled So it's pretty large. Well, for the weight the output layer um the
+
+[00:52:26] later layer becomes bigger because you have larger number of channels input channel output channel. So the output becomes larger. Actually the middle layer has low memory cost. If we uh do a deeper dissection for the activation of Alex net, this is a distribution for the number of activations. So total activation is 932,000. Peak activation is um equal to roughly
+
+[00:52:59] the input activation plus output activation is roughly 440k. And next let's talk about computation related matrix mac multiplication and accumulation. So uh one mac is equal to one multiplication one multiplication and one accumulation. So a equal to a + b * c that's one mac multiply accumulate
+
+[00:53:30] operation. And for matrix vector multiplication how many max do we have if the input uh dimension is m the output dimension is n. So to produce each output element you need uh n max and if you have m such output you have m * n max. So that's the uh amount of mac required by a matrix vector multiplication.
+
+[00:54:00] What about matrix matrix multiplication? The uh the dimension is n * k * k * n. So the number of Mac is n * n * k. So let's do a summary for different layer. What is number of max? So for linear layer um it's just a matrix multiplication. So it's co * c. For
+
+[00:54:31] convolution you have to multiply six terms together. You have c and co. You have h and w. you have KH and KW for group convolution you have group size of G. So uh you have to divide the con the compute by g because across different groups they don't talk to each other [cough and clears throat] for dep convolution the g equal to ci therefore it's canceled for the six terms you're left with only five terms.
+
+[00:55:02] So using that equation we can calculate the mac forx net. So multiply these six ter terms together. CIC and H and W and KH and KW. This is the MAC for first layer. And for second layer you have a stride of two a group of two. So we divide it by [clears throat] and so on. You can calculate the remaining layers. Altogether there are 724 meaning operations in total.
+
+[00:55:33] Finally, let's talk about um flop and flops. So, flop represent floating point operations. So, a multiply is a floatingoint operation and addition is also a floatingoint operation. So, [clears throat] one multiply accumulate operation. One Mac is equal to two floatingoint operations because one Mac has a add has a multiply which is two flop.
+
+[00:56:04] For example, Alex net has 724 max. How many floatingoint operations? So it's 700 * 2 that's 1.4 giga flops. Other one is floating point operation per second. So flops. So that's how many floatingoint operations do process for each second. What if the operation is not a floatingoint operations? nowadays become popular. You can you don't have
+
+[00:56:34] necessarily use the floating point unit. You can quantize them to four bit integer or 8 bit integer. So when the activation the weight are not always floating point you can generalize it to use the operation to measure the amount of computation. So that's op operation. >> [clears throat] >> The operations per second is just how many operations you can uh process for each second.
+
+[00:57:05] All right, remember this figure. We have a a faster growing demand of computing compared to the slower supply of computing and today's super big and this efficiency approaches uh will be helpful for the um we do we are going to do a quick review and then Sean will give us a tutorial about so this lecture we reviewed basics of neuronet networks popular layers fully connected convolution depos convolution
+
+[00:57:37] pooling normalization and then we introduced those efficiency metrics how to count the number of parameters flops model size activations operations per second etc.
